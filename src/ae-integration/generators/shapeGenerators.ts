@@ -132,7 +132,7 @@ export const SHAPE_OPERATOR_PROPERTIES: Record<string, Record<string, string>> =
  * Validate a vertex list and its tangents at generate time, so bad input fails
  * here with a clear message instead of somewhere inside After Effects.
  */
-function validatePathPoints(
+export function validatePathPoints(
   vertices: number[][],
   inTangents?: number[][],
   outTangents?: number[][]
@@ -163,7 +163,7 @@ function validatePathPoints(
 }
 
 /** Zero tangents (corner points) for a vertex list. */
-function zeroTangents(count: number): number[][] {
+export function zeroTangents(count: number): number[][] {
   const out: number[][] = [];
   for (let i = 0; i < count; i++) {
     out.push([0, 0]);
@@ -177,7 +177,7 @@ function zeroTangents(count: number): number[][] {
  * Tangents are RELATIVE to their own vertex, not absolute comp coordinates.
  * This is the single most common source of mangled curves.
  */
-function emitShapeObject(
+export function emitShapeObject(
   varName: string,
   vertices: number[][],
   inTangents: number[][],

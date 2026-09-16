@@ -130,6 +130,18 @@ export {
   SHAPE_MATCH_NAMES
 } from './generators/shapeGenerators.js';
 
+// Mask generators
+export {
+  generateAddMask,
+  generateListMasks,
+  generateGetMaskPath,
+  generateSetMaskPath,
+  generateSetMaskKeyframes,
+  generateSetMaskProperties,
+  generateDeleteMask,
+  MASK_MATCH_NAMES
+} from './generators/maskGenerators.js';
+
 // Render queue generators
 export {
   generateAddToRenderQueue,

@@ -437,6 +437,156 @@ const TOOLS = [
     generator: generators.generateAddShapeOperator
   },
   {
+    name: 'add_mask',
+    description: 'Add a mask to a layer, optionally with a bezier path. Tangents are RELATIVE to their own vertex.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        compId: { type: 'number' },
+        compName: { type: 'string' },
+        layerIndex: { type: 'number' },
+        layerName: { type: 'string' },
+        name: { type: 'string', description: 'Mask name' },
+        vertices: { type: 'array', description: 'Array of [x, y] points in layer space', items: { type: 'array', items: { type: 'number' } } },
+        inTangents: { type: 'array', description: 'Optional [x, y] per vertex, relative to that vertex', items: { type: 'array', items: { type: 'number' } } },
+        outTangents: { type: 'array', description: 'Optional [x, y] per vertex, relative to that vertex', items: { type: 'array', items: { type: 'number' } } },
+        closed: { type: 'boolean', description: 'Close the path (default true)' },
+        mode: { type: 'string', enum: ['none', 'add', 'subtract', 'intersect', 'lighten', 'darken', 'difference'] },
+        inverted: { type: 'boolean' },
+        rotoBezier: { type: 'boolean' },
+        feather: { type: 'number', description: 'Feather in pixels, applied to both axes' },
+        opacity: { type: 'number', description: 'Mask opacity percent' },
+        expansion: { type: 'number', description: 'Mask expansion in pixels' },
+        color: { type: 'object', description: 'Mask outline color (0-1 range)' }
+      }
+    },
+    generator: generators.generateAddMask
+  },
+  {
+    name: 'list_masks',
+    description: 'List every mask on a layer with its mode, feather, opacity, expansion and whether its path is animated',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        compId: { type: 'number' },
+        compName: { type: 'string' },
+        layerIndex: { type: 'number' },
+        layerName: { type: 'string' }
+      }
+    },
+    generator: generators.generateListMasks
+  },
+  {
+    name: 'get_mask_path',
+    description: 'Read a mask path back, including every keyframe when the path is animated',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        compId: { type: 'number' },
+        compName: { type: 'string' },
+        layerIndex: { type: 'number' },
+        layerName: { type: 'string' },
+        maskIndex: { type: 'number', description: '1-based mask index' },
+        maskName: { type: 'string' }
+      }
+    },
+    generator: generators.generateGetMaskPath
+  },
+  {
+    name: 'set_mask_path',
+    description: 'Replace a mask path with new vertices and tangents',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        compId: { type: 'number' },
+        compName: { type: 'string' },
+        layerIndex: { type: 'number' },
+        layerName: { type: 'string' },
+        maskIndex: { type: 'number' },
+        maskName: { type: 'string' },
+        vertices: { type: 'array', items: { type: 'array', items: { type: 'number' } } },
+        inTangents: { type: 'array', items: { type: 'array', items: { type: 'number' } } },
+        outTangents: { type: 'array', items: { type: 'array', items: { type: 'number' } } },
+        closed: { type: 'boolean' }
+      },
+      required: ['vertices']
+    },
+    generator: generators.generateSetMaskPath
+  },
+  {
+    name: 'set_mask_keyframes',
+    description: 'Animate a mask path. Each keyframe carries its own full vertex list.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        compId: { type: 'number' },
+        compName: { type: 'string' },
+        layerIndex: { type: 'number' },
+        layerName: { type: 'string' },
+        maskIndex: { type: 'number' },
+        maskName: { type: 'string' },
+        keyframes: {
+          type: 'array',
+          description: 'Array of { time, vertices, inTangents?, outTangents?, closed? }',
+          items: {
+            type: 'object',
+            properties: {
+              time: { type: 'number', description: 'Time in seconds' },
+              vertices: { type: 'array', items: { type: 'array', items: { type: 'number' } } },
+              inTangents: { type: 'array', items: { type: 'array', items: { type: 'number' } } },
+              outTangents: { type: 'array', items: { type: 'array', items: { type: 'number' } } },
+              closed: { type: 'boolean' }
+            },
+            required: ['time', 'vertices']
+          }
+        }
+      },
+      required: ['keyframes']
+    },
+    generator: generators.generateSetMaskKeyframes
+  },
+  {
+    name: 'set_mask_properties',
+    description: 'Change a mask\'s mode, inversion, lock, feather, opacity, expansion or color without touching its path. A locked mask is temporarily unlocked so the changes apply.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        compId: { type: 'number' },
+        compName: { type: 'string' },
+        layerIndex: { type: 'number' },
+        layerName: { type: 'string' },
+        maskIndex: { type: 'number' },
+        maskName: { type: 'string' },
+        name: { type: 'string', description: 'Rename the mask' },
+        mode: { type: 'string', enum: ['none', 'add', 'subtract', 'intersect', 'lighten', 'darken', 'difference'] },
+        inverted: { type: 'boolean' },
+        locked: { type: 'boolean' },
+        rotoBezier: { type: 'boolean' },
+        feather: { type: 'number' },
+        opacity: { type: 'number' },
+        expansion: { type: 'number' },
+        color: { type: 'object', description: 'Mask outline color (0-1 range)' }
+      }
+    },
+    generator: generators.generateSetMaskProperties
+  },
+  {
+    name: 'delete_mask',
+    description: 'Delete a mask from a layer',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        compId: { type: 'number' },
+        compName: { type: 'string' },
+        layerIndex: { type: 'number' },
+        layerName: { type: 'string' },
+        maskIndex: { type: 'number' },
+        maskName: { type: 'string' }
+      }
+    },
+    generator: generators.generateDeleteMask
+  },
+  {
     name: 'add_to_render_queue',
     description: 'Add a composition to the render queue, optionally applying render settings and output module templates and an output path',
     inputSchema: {
