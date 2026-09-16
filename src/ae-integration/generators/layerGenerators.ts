@@ -254,12 +254,14 @@ export function generateAddShapeLayer(params: {
     script += 'ellipse.property("ADBE Vector Ellipse Size").setValue([' + sizeW + ', ' + sizeH + ']);\n';
   } else if (shape === 'polygon') {
     script += 'var poly = shapeContents.addProperty("ADBE Vector Shape - Star");\n';
-    script += 'poly.property("ADBE Vector Star Type").setValue(1);\n'; // polygon
+    // Polystar Type is 1 = STAR, 2 = POLYGON (verified: Inner Radius is only
+    // settable under 1). These were reversed, so 'polygon' silently drew a star.
+    script += 'poly.property("ADBE Vector Star Type").setValue(2);\n'; // polygon
     script += 'poly.property("ADBE Vector Star Points").setValue(' + (params.points || 6) + ');\n';
     script += 'poly.property("ADBE Vector Star Outer Radius").setValue(' + (params.outerRadius || 100) + ');\n';
   } else if (shape === 'star') {
     script += 'var star = shapeContents.addProperty("ADBE Vector Shape - Star");\n';
-    script += 'star.property("ADBE Vector Star Type").setValue(2);\n'; // star
+    script += 'star.property("ADBE Vector Star Type").setValue(1);\n'; // star
     script += 'star.property("ADBE Vector Star Points").setValue(' + (params.points || 5) + ');\n';
     script += 'star.property("ADBE Vector Star Outer Radius").setValue(' + (params.outerRadius || 100) + ');\n';
     script += 'star.property("ADBE Vector Star Inner Radius").setValue(' + (params.innerRadius || 50) + ');\n';
@@ -379,7 +381,7 @@ export function generateAddCameraLayer(params: {
   }
 
   if (params.zoom) {
-    script += 'layer.property("Camera Options").property("Zoom").setValue(' + params.zoom + ');\n';
+    script += 'layer.property("ADBE Camera Options Group").property("ADBE Camera Zoom").setValue(' + params.zoom + ');\n';
   }
 
   script += generateResultObject({
@@ -414,10 +416,10 @@ export function generateAddLightLayer(params: {
   script += 'layer.lightType = ' + generateLightType(lightType) + ';\n';
 
   if (params.color) {
-    script += 'layer.property("Light Options").property("Color").setValue(' + colorToES3(params.color) + ');\n';
+    script += 'layer.property("ADBE Light Options Group").property("ADBE Light Color").setValue(' + colorToES3(params.color) + ');\n';
   }
   if (params.intensity !== undefined) {
-    script += 'layer.property("Light Options").property("Intensity").setValue(' + params.intensity + ');\n';
+    script += 'layer.property("ADBE Light Options Group").property("ADBE Light Intensity").setValue(' + params.intensity + ');\n';
   }
 
   script += generateResultObject({
