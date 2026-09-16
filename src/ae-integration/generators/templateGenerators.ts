@@ -403,6 +403,11 @@ export function generateCreateLogoReveal(params: {
   duration?: number;
   backgroundColor?: { r: number; g: number; b: number };
 }): string {
+  // Without this, neither branch below declares logoItem and the script dies
+  // with a bare "ReferenceError: logoItem is undefined".
+  if (params.logoItemId === undefined && !params.logoItemName) {
+    throw new Error('create_logo_reveal animates an existing logo item: pass logoItemId or logoItemName');
+  }
   let script = '';
   script += generateProjectCheck();
   script += generateCompAccess(params.compId, params.compName);
