@@ -316,10 +316,125 @@ const TOOLS = [
         strokeWidth: { type: 'number' },
         points: { type: 'number', description: 'Number of points for polygon/star' },
         innerRadius: { type: 'number', description: 'Inner radius for star' },
-        outerRadius: { type: 'number', description: 'Outer radius for polygon/star' }
+        outerRadius: { type: 'number', description: 'Outer radius for polygon/star' },
+        roundness: { type: 'number', description: 'Corner roundness (rectangle only)' }
       }
     },
     generator: generators.generateAddShapeLayer
+  },
+  {
+    name: 'create_path',
+    description: 'Create an editable bezier path on a shape layer. Creates a new shape layer unless layerIndex/layerName is given. Tangents are RELATIVE to their own vertex, not absolute coordinates.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        compId: { type: 'number' },
+        compName: { type: 'string' },
+        layerIndex: { type: 'number', description: 'Existing shape layer to add the path to' },
+        layerName: { type: 'string', description: 'Existing shape layer to add the path to' },
+        name: { type: 'string', description: 'Name for the new layer (when creating one)' },
+        pathName: { type: 'string', description: 'Name for the path group' },
+        groupIndex: { type: 'number', description: 'Which shape group to add to (default: first, created if none)' },
+        vertices: {
+          type: 'array',
+          description: 'Array of [x, y] points in layer space. At least 2 required.',
+          items: { type: 'array', items: { type: 'number' } }
+        },
+        inTangents: {
+          type: 'array',
+          description: 'Optional [x, y] per vertex, RELATIVE to that vertex. Defaults to corner points.',
+          items: { type: 'array', items: { type: 'number' } }
+        },
+        outTangents: {
+          type: 'array',
+          description: 'Optional [x, y] per vertex, RELATIVE to that vertex. Defaults to corner points.',
+          items: { type: 'array', items: { type: 'number' } }
+        },
+        closed: { type: 'boolean', description: 'Close the path (default true)' },
+        fillColor: { type: 'object', description: 'Fill color (0-1 range)' },
+        strokeColor: { type: 'object', description: 'Stroke color (0-1 range)' },
+        strokeWidth: { type: 'number' },
+        position: { type: 'object', description: 'Layer position {x, y}' }
+      },
+      required: ['vertices']
+    },
+    generator: generators.generateCreatePath
+  },
+  {
+    name: 'get_path',
+    description: 'Read a bezier path back from a shape layer, including all keyframes if it is animated. Returns vertices, inTangents, outTangents and closed.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        compId: { type: 'number' },
+        compName: { type: 'string' },
+        layerIndex: { type: 'number' },
+        layerName: { type: 'string' },
+        pathName: { type: 'string', description: 'Which path to read; omit for the first path found' }
+      }
+    },
+    generator: generators.generateGetPath
+  },
+  {
+    name: 'set_path_keyframes',
+    description: 'Animate a bezier path by writing shape keyframes. Each keyframe needs its own full vertex list; vertex counts may differ between keys but AE interpolates best when they match.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        compId: { type: 'number' },
+        compName: { type: 'string' },
+        layerIndex: { type: 'number' },
+        layerName: { type: 'string' },
+        pathName: { type: 'string', description: 'Which path to animate; omit for the first path found' },
+        keyframes: {
+          type: 'array',
+          description: 'Array of { time, vertices, inTangents?, outTangents?, closed? }',
+          items: {
+            type: 'object',
+            properties: {
+              time: { type: 'number', description: 'Time in seconds' },
+              vertices: { type: 'array', items: { type: 'array', items: { type: 'number' } } },
+              inTangents: { type: 'array', items: { type: 'array', items: { type: 'number' } } },
+              outTangents: { type: 'array', items: { type: 'array', items: { type: 'number' } } },
+              closed: { type: 'boolean' }
+            },
+            required: ['time', 'vertices']
+          }
+        }
+      },
+      required: ['keyframes']
+    },
+    generator: generators.generateSetPathKeyframes
+  },
+  {
+    name: 'add_shape_operator',
+    description: 'Add a shape operator (Trim Paths, Repeater, Round Corners, Zig Zag, Twist, Pucker & Bloat, Offset Paths, Wiggle Paths, Wiggle Transform, Merge Paths, Gradient Fill/Stroke) to a shape layer. NOTE: gradient COLOR STOPS cannot be set by scripting - After Effects exposes ADBE Vector Grad Colors as NO_VALUE - so gradients will render with default colors.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        compId: { type: 'number' },
+        compName: { type: 'string' },
+        layerIndex: { type: 'number' },
+        layerName: { type: 'string' },
+        operator: {
+          type: 'string',
+          enum: [
+            'trimPaths', 'repeater', 'roundCorners', 'zigZag', 'twist', 'puckerBloat',
+            'offsetPaths', 'wigglePaths', 'wiggleTransform', 'mergePaths',
+            'gradientFill', 'gradientStroke'
+          ],
+          description: 'Which operator to add'
+        },
+        groupIndex: { type: 'number', description: 'Which shape group to add to (default: first)' },
+        name: { type: 'string', description: 'Rename the operator' },
+        properties: {
+          type: 'object',
+          description: 'Operator properties by friendly name, e.g. { start: 0, end: 50 } for trimPaths or { copies: 6 } for repeater'
+        }
+      },
+      required: ['operator']
+    },
+    generator: generators.generateAddShapeOperator
   },
   {
     name: 'add_null_layer',

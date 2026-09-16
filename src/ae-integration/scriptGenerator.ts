@@ -119,6 +119,17 @@ export {
   generateNavigateMarkers
 } from './generators/markerGenerators.js';
 
+// Shape generators (bezier paths + shape operators)
+export {
+  generateCreatePath,
+  generateGetPath,
+  generateSetPathKeyframes,
+  generateAddShapeOperator,
+  SHAPE_OPERATORS,
+  SHAPE_OPERATOR_PROPERTIES,
+  SHAPE_MATCH_NAMES
+} from './generators/shapeGenerators.js';
+
 // Helpers (for direct use if needed)
 export {
   escapeString,

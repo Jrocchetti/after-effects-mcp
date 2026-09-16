@@ -219,6 +219,7 @@ export function generateAddShapeLayer(params: {
   points?: number;
   innerRadius?: number;
   outerRadius?: number;
+  roundness?: number;
 }): string {
   let script = '';
   script += generateProjectCheck();
@@ -230,10 +231,13 @@ export function generateAddShapeLayer(params: {
     script += 'layer.name = "' + escapeString(params.name) + '";\n';
   }
 
-  // Add shape content
-  script += 'var contents = layer.property("Contents");\n';
+  // Add shape content.
+  // Everything below addresses properties by matchName rather than English
+  // display name. property("Size") returns null on a non-English After Effects
+  // and the script then dies on a null dereference.
+  script += 'var contents = layer.property("ADBE Root Vectors Group");\n';
   script += 'var shapeGroup = contents.addProperty("ADBE Vector Group");\n';
-  script += 'var shapeContents = shapeGroup.property("Contents");\n';
+  script += 'var shapeContents = shapeGroup.property("ADBE Vectors Group");\n';
 
   const shape = params.shape || 'rectangle';
   const sizeW = params.size?.width || 200;
@@ -241,44 +245,48 @@ export function generateAddShapeLayer(params: {
 
   if (shape === 'rectangle') {
     script += 'var rect = shapeContents.addProperty("ADBE Vector Shape - Rect");\n';
-    script += 'rect.property("Size").setValue([' + sizeW + ', ' + sizeH + ']);\n';
+    script += 'rect.property("ADBE Vector Rect Size").setValue([' + sizeW + ', ' + sizeH + ']);\n';
+    if (params.roundness !== undefined) {
+      script += 'rect.property("ADBE Vector Rect Roundness").setValue(' + params.roundness + ');\n';
+    }
   } else if (shape === 'ellipse') {
     script += 'var ellipse = shapeContents.addProperty("ADBE Vector Shape - Ellipse");\n';
-    script += 'ellipse.property("Size").setValue([' + sizeW + ', ' + sizeH + ']);\n';
+    script += 'ellipse.property("ADBE Vector Ellipse Size").setValue([' + sizeW + ', ' + sizeH + ']);\n';
   } else if (shape === 'polygon') {
     script += 'var poly = shapeContents.addProperty("ADBE Vector Shape - Star");\n';
-    script += 'poly.property("Type").setValue(1);\n'; // polygon
-    script += 'poly.property("Points").setValue(' + (params.points || 6) + ');\n';
-    script += 'poly.property("Outer Radius").setValue(' + (params.outerRadius || 100) + ');\n';
+    script += 'poly.property("ADBE Vector Star Type").setValue(1);\n'; // polygon
+    script += 'poly.property("ADBE Vector Star Points").setValue(' + (params.points || 6) + ');\n';
+    script += 'poly.property("ADBE Vector Star Outer Radius").setValue(' + (params.outerRadius || 100) + ');\n';
   } else if (shape === 'star') {
     script += 'var star = shapeContents.addProperty("ADBE Vector Shape - Star");\n';
-    script += 'star.property("Type").setValue(2);\n'; // star
-    script += 'star.property("Points").setValue(' + (params.points || 5) + ');\n';
-    script += 'star.property("Outer Radius").setValue(' + (params.outerRadius || 100) + ');\n';
-    script += 'star.property("Inner Radius").setValue(' + (params.innerRadius || 50) + ');\n';
+    script += 'star.property("ADBE Vector Star Type").setValue(2);\n'; // star
+    script += 'star.property("ADBE Vector Star Points").setValue(' + (params.points || 5) + ');\n';
+    script += 'star.property("ADBE Vector Star Outer Radius").setValue(' + (params.outerRadius || 100) + ');\n';
+    script += 'star.property("ADBE Vector Star Inner Radius").setValue(' + (params.innerRadius || 50) + ');\n';
   }
 
   // Add fill
   if (params.fillColor) {
     script += 'var fill = shapeContents.addProperty("ADBE Vector Graphic - Fill");\n';
-    script += 'fill.property("Color").setValue(' + colorToES3(params.fillColor) + ');\n';
+    script += 'fill.property("ADBE Vector Fill Color").setValue(' + colorToES3(params.fillColor) + ');\n';
   }
 
   // Add stroke
   if (params.strokeColor) {
     script += 'var stroke = shapeContents.addProperty("ADBE Vector Graphic - Stroke");\n';
-    script += 'stroke.property("Color").setValue(' + colorToES3(params.strokeColor) + ');\n';
+    script += 'stroke.property("ADBE Vector Stroke Color").setValue(' + colorToES3(params.strokeColor) + ');\n';
     if (params.strokeWidth !== undefined) {
-      script += 'stroke.property("Stroke Width").setValue(' + params.strokeWidth + ');\n';
+      script += 'stroke.property("ADBE Vector Stroke Width").setValue(' + params.strokeWidth + ');\n';
     }
   }
 
   // Position
+  script += 'var xform = layer.property("ADBE Transform Group");\n';
   if (params.position) {
-    script += 'layer.property("Position").setValue(' + positionToES3(params.position) + ');\n';
+    script += 'xform.property("ADBE Position").setValue(' + positionToES3(params.position) + ');\n';
   } else {
     // Center in comp
-    script += 'layer.property("Position").setValue([comp.width/2, comp.height/2]);\n';
+    script += 'xform.property("ADBE Position").setValue([comp.width/2, comp.height/2]);\n';
   }
 
   script += generateResultObject({
