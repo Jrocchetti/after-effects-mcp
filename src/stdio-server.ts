@@ -437,6 +437,169 @@ const TOOLS = [
     generator: generators.generateAddShapeOperator
   },
   {
+    name: 'set_comp_renderer',
+    description: 'Set a composition\'s 3D renderer. This is the unlock for extrusion, bevel, environment layers and reflections - all of which are inert under the Classic renderer. NOTE: the internal name "ADBE Advanced 3d" is the CLASSIC renderer, not Advanced 3D, and it is the default for new comps.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        compId: { type: 'number' },
+        compName: { type: 'string' },
+        renderer: {
+          type: 'string',
+          description: 'classic (no extrusion), advanced (extrusion + shadow colour), cinema4d (extrusion + reflections). A raw "ADBE ..." string is also accepted.',
+          enum: ['classic', 'advanced', 'cinema4d']
+        }
+      },
+      required: ['renderer']
+    },
+    generator: generators.generateSetCompRenderer
+  },
+  {
+    name: 'get_3d_info',
+    description: 'Read a composition\'s renderer and available renderers, and optionally a layer\'s 3D state with current Material, Camera, Light and Geometry values. Use this before setting 3D properties to see what is actually available.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        compId: { type: 'number' },
+        compName: { type: 'string' },
+        layerIndex: { type: 'number' },
+        layerName: { type: 'string' }
+      }
+    },
+    generator: generators.generateGet3DInfo
+  },
+  {
+    name: 'set_3d_layer',
+    description: 'Enable or disable 3D on a layer and set its 3D transform. Position is set through the combined property because the separated X/Y/Z Position properties are read-only unless Separate Dimensions is enabled.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        compId: { type: 'number' },
+        compName: { type: 'string' },
+        layerIndex: { type: 'number' },
+        layerName: { type: 'string' },
+        enable3D: { type: 'boolean', description: 'Turn the layer\'s 3D switch on or off' },
+        anchorPoint: { type: 'array', items: { type: 'number' }, description: '[x, y, z]' },
+        position: { type: 'array', items: { type: 'number' }, description: '[x, y, z]' },
+        scale: { type: 'array', items: { type: 'number' }, description: '[x, y, z] percent' },
+        orientation: { type: 'array', items: { type: 'number' }, description: '[x, y, z] degrees' },
+        rotationX: { type: 'number', description: 'Degrees' },
+        rotationY: { type: 'number', description: 'Degrees' },
+        rotationZ: { type: 'number', description: 'Degrees' },
+        opacity: { type: 'number', description: 'Percent' }
+      }
+    },
+    generator: generators.generateSet3DLayer
+  },
+  {
+    name: 'set_material_options',
+    description: 'Set Material Options on a 3D layer - shadows, lights, ambient/diffuse/specular, metal, reflection and transparency. Properties refused by the current renderer are reported in "failed" rather than aborting the call.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        compId: { type: 'number' },
+        compName: { type: 'string' },
+        layerIndex: { type: 'number' },
+        layerName: { type: 'string' },
+        castsShadows: { type: 'boolean' },
+        lightTransmission: { type: 'number', description: 'Percent' },
+        acceptsShadows: { type: 'boolean' },
+        acceptsLights: { type: 'boolean' },
+        shadowColor: { type: 'object', description: 'Colour (0-1 range). Advanced renderer only.' },
+        appearsInReflections: { type: 'boolean', description: 'CINEMA 4D renderer only' },
+        ambient: { type: 'number', description: 'Percent' },
+        diffuse: { type: 'number', description: 'Percent' },
+        specularIntensity: { type: 'number', description: 'Percent' },
+        specularShininess: { type: 'number', description: 'Percent' },
+        metal: { type: 'number', description: 'Percent' },
+        reflectionIntensity: { type: 'number', description: 'Percent. CINEMA 4D renderer only.' },
+        reflectionSharpness: { type: 'number', description: 'Percent' },
+        reflectionRolloff: { type: 'number', description: 'Percent' },
+        transparency: { type: 'number', description: 'Percent' },
+        transparencyRolloff: { type: 'number', description: 'Percent' },
+        indexOfRefraction: { type: 'number' }
+      }
+    },
+    generator: generators.generateSetMaterialOptions
+  },
+  {
+    name: 'set_geometry_options',
+    description: 'Set Geometry Options on a 3D layer. Extrusion and bevel apply to text and shape layers only and REQUIRE the advanced or cinema4d renderer - the call fails fast with an actionable message otherwise, rather than surfacing After Effects\' opaque "property is hidden" error. Curvature and segments apply to the plane geometry group.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        compId: { type: 'number' },
+        compName: { type: 'string' },
+        layerIndex: { type: 'number' },
+        layerName: { type: 'string' },
+        extrusionDepth: { type: 'number', description: 'Text and shape layers only; needs advanced/cinema4d renderer' },
+        bevelStyle: { type: 'number', description: '1 none, 2 angular, 3 concave, 4 convex' },
+        bevelDirection: { type: 'number' },
+        bevelDepth: { type: 'number' },
+        holeBevelDepth: { type: 'number', description: 'Percent' },
+        curvature: { type: 'number', description: 'Plane geometry curvature, percent' },
+        segments: { type: 'number', description: 'Plane geometry subdivisions' }
+      }
+    },
+    generator: generators.generateSetGeometryOptions
+  },
+  {
+    name: 'set_camera_options',
+    description: 'Set Camera Options on a camera layer - zoom, depth of field, focus, aperture, blur, and the iris/highlight controls',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        compId: { type: 'number' },
+        compName: { type: 'string' },
+        layerIndex: { type: 'number' },
+        layerName: { type: 'string' },
+        zoom: { type: 'number', description: 'Pixels' },
+        depthOfField: { type: 'boolean' },
+        focusDistance: { type: 'number', description: 'Pixels' },
+        aperture: { type: 'number', description: 'Pixels' },
+        blurLevel: { type: 'number', description: 'Percent' },
+        focusAreaWidth: { type: 'number' },
+        nearFarBlurLevel: { type: 'number' },
+        irisShape: { type: 'number', description: 'Iris shape index' },
+        irisRotation: { type: 'number', description: 'Degrees' },
+        irisRoundness: { type: 'number', description: 'Percent' },
+        irisAspectRatio: { type: 'number' },
+        irisDiffractionFringe: { type: 'number' },
+        highlightGain: { type: 'number' },
+        highlightThreshold: { type: 'number' },
+        highlightSaturation: { type: 'number' }
+      }
+    },
+    generator: generators.generateSetCameraOptions
+  },
+  {
+    name: 'set_light_options',
+    description: 'Set Light Options on a light layer - intensity, colour, cone angle and feather, falloff, shadows, and the environment-light background controls',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        compId: { type: 'number' },
+        compName: { type: 'string' },
+        layerIndex: { type: 'number' },
+        layerName: { type: 'string' },
+        intensity: { type: 'number', description: 'Percent' },
+        color: { type: 'object', description: 'Colour (0-1 range)' },
+        coneAngle: { type: 'number', description: 'Degrees; spot lights' },
+        coneFeather: { type: 'number', description: 'Percent; spot lights' },
+        falloff: { type: 'number', description: '1 none, 2 smooth, 3 inverse square clamped' },
+        radius: { type: 'number' },
+        falloffDistance: { type: 'number' },
+        castsShadows: { type: 'boolean' },
+        shadowDarkness: { type: 'number', description: 'Percent' },
+        shadowDiffusion: { type: 'number', description: 'Pixels' },
+        backgroundVisible: { type: 'boolean', description: 'Environment lights' },
+        backgroundOpacity: { type: 'number', description: 'Environment lights' },
+        backgroundBlur: { type: 'number', description: 'Environment lights' }
+      }
+    },
+    generator: generators.generateSetLightOptions
+  },
+  {
     name: 'add_mask',
     description: 'Add a mask to a layer, optionally with a bezier path. Tangents are RELATIVE to their own vertex.',
     inputSchema: {

@@ -130,6 +130,25 @@ export {
   SHAPE_MATCH_NAMES
 } from './generators/shapeGenerators.js';
 
+// 3D generators
+export {
+  generateSetCompRenderer,
+  generateSet3DLayer,
+  generateSetMaterialOptions,
+  generateSetGeometryOptions,
+  generateSetCameraOptions,
+  generateSetLightOptions,
+  generateGet3DInfo,
+  RENDERERS,
+  EXTRUSION_RENDERERS,
+  MATERIAL_PROPERTIES,
+  CAMERA_PROPERTIES,
+  LIGHT_PROPERTIES,
+  EXTRUSION_PROPERTIES,
+  PLANE_PROPERTIES,
+  TRANSFORM_3D_PROPERTIES
+} from './generators/threeDGenerators.js';
+
 // Mask generators
 export {
   generateAddMask,
