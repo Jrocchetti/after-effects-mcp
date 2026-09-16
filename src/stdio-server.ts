@@ -437,6 +437,91 @@ const TOOLS = [
     generator: generators.generateAddShapeOperator
   },
   {
+    name: 'add_to_render_queue',
+    description: 'Add a composition to the render queue, optionally applying render settings and output module templates and an output path',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        compId: { type: 'number' },
+        compName: { type: 'string' },
+        outputPath: { type: 'string', description: 'Absolute output file path. NOTE: the output module template decides the actual container/extension - passing a .mov path while the module is set to H.264 produces a .mp4. Check the returned outputPath.' },
+        renderSettingsTemplate: { type: 'string', description: 'Name of an existing render settings template (see list_render_templates)' },
+        outputModuleTemplate: { type: 'string', description: 'Name of an existing output module template (see list_render_templates)' },
+        timeSpanStart: { type: 'number', description: 'Render start time in seconds' },
+        timeSpanDuration: { type: 'number', description: 'Render duration in seconds' },
+        skipFrames: { type: 'number', description: 'Frames to skip between rendered frames (0 renders every frame)' }
+      }
+    },
+    generator: generators.generateAddToRenderQueue
+  },
+  {
+    name: 'list_render_queue',
+    description: 'List every render queue item with its status, time span and output modules. Use this to poll progress while a render runs.',
+    inputSchema: { type: 'object', properties: {} },
+    generator: generators.generateListRenderQueue
+  },
+  {
+    name: 'list_render_templates',
+    description: 'List the render settings and output module templates configured in this After Effects install, so renders can reuse existing presets by name',
+    inputSchema: { type: 'object', properties: {} },
+    generator: generators.generateListRenderTemplates
+  },
+  {
+    name: 'set_render_queue_item',
+    description: 'Change an existing render queue item - output path, templates, time span, or whether it is queued to render',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        itemIndex: { type: 'number', description: '1-based render queue index' },
+        outputPath: { type: 'string' },
+        renderSettingsTemplate: { type: 'string' },
+        outputModuleTemplate: { type: 'string' },
+        outputModuleIndex: { type: 'number', description: 'Which output module to change (default 1)' },
+        timeSpanStart: { type: 'number' },
+        timeSpanDuration: { type: 'number' },
+        skipFrames: { type: 'number' },
+        render: { type: 'boolean', description: 'Whether this item is checked for the next render pass' }
+      },
+      required: ['itemIndex']
+    },
+    generator: generators.generateSetRenderQueueItem
+  },
+  {
+    name: 'remove_from_render_queue',
+    description: 'Remove one render queue item, or clear the entire queue with all: true',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        itemIndex: { type: 'number', description: '1-based render queue index' },
+        all: { type: 'boolean', description: 'Clear the whole queue' }
+      }
+    },
+    generator: generators.generateRemoveFromRenderQueue
+  },
+  {
+    name: 'control_render',
+    description: 'Start, stop, pause or resume rendering, or show the Render Queue panel. WARNING: start is synchronous - After Effects blocks until the queue finishes, so this call will usually time out on any real render. Prefer queue_in_ame for long jobs, or start and then poll list_render_queue.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['start', 'stop', 'pause', 'resume', 'showWindow'] }
+      },
+      required: ['action']
+    },
+    generator: generators.generateControlRender
+  },
+  {
+    name: 'queue_in_ame',
+    description: 'Send the render queue to Adobe Media Encoder. Returns immediately because AME renders in its own process, which makes it the better choice for long jobs. Set renderImmediately to start AME processing rather than only queueing.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        renderImmediately: { type: 'boolean', description: 'Also start AME processing its queue (default false)' }
+      }
+    },
+    generator: generators.generateQueueInAME
+  },
+  {
     name: 'list_project_items',
     description: 'List every item in the project, optionally filtered by type',
     inputSchema: {

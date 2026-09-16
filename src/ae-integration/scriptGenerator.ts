@@ -130,6 +130,17 @@ export {
   SHAPE_MATCH_NAMES
 } from './generators/shapeGenerators.js';
 
+// Render queue generators
+export {
+  generateAddToRenderQueue,
+  generateListRenderQueue,
+  generateListRenderTemplates,
+  generateSetRenderQueueItem,
+  generateRemoveFromRenderQueue,
+  generateControlRender,
+  generateQueueInAME
+} from './generators/renderQueueGenerators.js';
+
 // Helpers (for direct use if needed)
 export {
   escapeString,
