@@ -13,7 +13,7 @@ For worked recipes, read `examples.md` in this skill.
 
 - **Ask before calling tools that change the open project as a whole**: `save_project`, `close_project`, `open_project`, `create_project`, `reduce_project`, `collect_files`, `organize_project_items`, `import_footage`, `import_folder`, `replace_footage`. The user usually has real work open.
 - **Look before you edit.** Call `list_compositions`, `list_layers` or `get_layer_info` rather than guessing names.
-- **Every tool call is one undo step**, named for the operation ("Undo Create Lower Third"). Prefer a few purposeful calls over many tiny ones, so the user can undo cleanly.
+- **Each tool call runs inside an undo group.** Prefer a few purposeful calls over many tiny ones, so the user can undo cleanly.
 - Times are in **seconds**. Colours are **0-1** RGB objects: `{"r": 1, "g": 0.5, "b": 0}`.
 
 ## Property paths
