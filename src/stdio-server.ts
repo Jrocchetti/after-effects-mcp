@@ -437,6 +437,152 @@ const TOOLS = [
     generator: generators.generateAddShapeOperator
   },
   {
+    name: 'list_project_items',
+    description: 'List every item in the project, optionally filtered by type',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        type: { type: 'string', enum: ['composition', 'footage', 'folder'], description: 'Only return items of this type' }
+      }
+    },
+    generator: generators.generateListProjectItems
+  },
+  {
+    name: 'set_active_composition',
+    description: 'Open a composition in the viewer and make it the active item',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        compId: { type: 'number' },
+        compName: { type: 'string' }
+      }
+    },
+    generator: generators.generateSetActiveComposition
+  },
+  {
+    name: 'set_proxy',
+    description: 'Attach a proxy file to a project item',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        itemId: { type: 'number' },
+        itemName: { type: 'string' },
+        proxyPath: { type: 'string', description: 'Absolute path to the proxy file' }
+      },
+      required: ['proxyPath']
+    },
+    generator: generators.generateSetProxy
+  },
+  {
+    name: 'remove_proxy',
+    description: 'Detach the proxy from a project item',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        itemId: { type: 'number' },
+        itemName: { type: 'string' }
+      }
+    },
+    generator: generators.generateRemoveProxy
+  },
+  {
+    name: 'get_current_time',
+    description: 'Get the current playhead time of a composition, in seconds and frames',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        compId: { type: 'number' },
+        compName: { type: 'string' }
+      }
+    },
+    generator: generators.generateGetCurrentTime
+  },
+  {
+    name: 'set_current_time',
+    description: 'Move the playhead of a composition. Give either time (seconds) or frame.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        compId: { type: 'number' },
+        compName: { type: 'string' },
+        time: { type: 'number', description: 'Time in seconds' },
+        frame: { type: 'number', description: 'Frame number (used when time is omitted)' }
+      }
+    },
+    generator: generators.generateSetCurrentTime
+  },
+  {
+    name: 'snap_to_marker',
+    description: 'Move the playhead to a specific marker, on the composition or on a layer',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        compId: { type: 'number' },
+        compName: { type: 'string' },
+        markerIndex: { type: 'number', description: '1-based marker index' },
+        layerIndex: { type: 'number', description: 'Use a layer marker instead of a comp marker' },
+        layerName: { type: 'string', description: 'Use a layer marker instead of a comp marker' }
+      },
+      required: ['markerIndex']
+    },
+    generator: generators.generateSnapToMarker
+  },
+  {
+    name: 'get_nearest_marker',
+    description: 'Find the marker closest to a given time',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        compId: { type: 'number' },
+        compName: { type: 'string' },
+        time: { type: 'number', description: 'Time in seconds; defaults to the current playhead' },
+        direction: { type: 'string', enum: ['previous', 'next', 'nearest'], description: 'Which way to look (default nearest)' }
+      }
+    },
+    generator: generators.generateGetNearestMarker
+  },
+  {
+    name: 'navigate_markers',
+    description: 'Jump the playhead to the first, last, previous or next composition marker',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        compId: { type: 'number' },
+        compName: { type: 'string' },
+        direction: { type: 'string', enum: ['first', 'last', 'previous', 'next'] }
+      },
+      required: ['direction']
+    },
+    generator: generators.generateNavigateMarkers
+  },
+  {
+    name: 'batch_set_expressions',
+    description: 'Set several expressions on one layer in a single operation',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        compId: { type: 'number' },
+        compName: { type: 'string' },
+        layerIndex: { type: 'number' },
+        layerName: { type: 'string' },
+        expressions: {
+          type: 'array',
+          description: 'Array of { property, expression }',
+          items: {
+            type: 'object',
+            properties: {
+              property: { type: 'string', description: 'Property name, e.g. "Position"' },
+              expression: { type: 'string' }
+            },
+            required: ['property', 'expression']
+          }
+        }
+      },
+      required: ['expressions']
+    },
+    generator: generators.generateBatchSetExpressions
+  },
+  {
     name: 'add_null_layer',
     description: 'Add a null object layer',
     inputSchema: {
