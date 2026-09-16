@@ -14,6 +14,20 @@ import {
   generateResultObject
 } from './helpers.js';
 
+// Finds the most recent keyframe at or before `time` (n = 0 if none), and the
+// time since it. Shared by the physics templates.
+const PREV_KEY = [
+  'var n = 0;',
+  'if (numKeys > 0) {',
+  '  n = nearestKey(time).index;',
+  '  if (key(n).time > time) { n--; }',
+  '}',
+  'var t = (n > 0) ? time - key(n).time : 0;'
+].join('\n');
+
+// Velocity arriving at key n: sampled a tenth of a frame before it.
+const V_IN = 'velocityAtTime(key(n).time - thisComp.frameDuration / 10)';
+
 // Expression templates library
 const EXPRESSION_TEMPLATES: Record<string, {
   expression: string;
@@ -133,42 +147,201 @@ const EXPRESSION_TEMPLATES: Record<string, {
     params: {
       pathLayer: { type: 'string', default: 'Path Layer', description: 'Layer containing the path' },
       shapeName: { type: 'string', default: 'Path 1', description: 'Name of the shape path' },
-      progress: { type: 'string', default: 'time / thisComp.duration', description: 'Progress expression (0-1)' }
+      progress: { type: 'expression', default: 'time / thisComp.duration', description: 'Progress expression (0-1)' }
     }
   },
 
-  // Physics expressions
-  bounce: {
-    expression: 'var amplitude = {{amplitude}};\nvar frequency = {{frequency}};\nvar decay = {{decay}};\nvar numKeys = numKeys;\nif (numKeys > 0) {\n  var t = time - key(numKeys).time;\n  if (t > 0) {\n    var v = velocityAtTime(key(numKeys).time - 0.001);\n    value + v * amplitude * Math.sin(frequency * t * 2 * Math.PI) / Math.exp(decay * t);\n  } else {\n    value;\n  }\n} else {\n  value;\n}',
-    description: 'Bouncy overshoot after keyframes',
+  // Physics expressions.
+  //
+  // These all react to the most recent keyframe at or before the playhead
+  // (PREV_KEY), so they act after EVERY keyframe. The originals keyed off
+  // key(numKeys) and only ever affected the motion after the final keyframe.
+  // Incoming velocity is sampled a tenth of a frame before the key, so it is
+  // the velocity arriving at the key rather than leaving it.
+  overshoot: {
+    // Damped sine, divided by the angular frequency w so the wobble starts at
+    // exactly the incoming velocity - no kink at the keyframe. The original
+    // measured value - lastKey.value, which is 0 after the last key, so it
+    // did nothing.
+    expression: [
+      PREV_KEY,
+      'var freq = {{frequency}};',
+      'var decay = {{decay}};',
+      'if (n > 0 && t > 0) {',
+      '  var v = ' + V_IN + ';',
+      '  var w = freq * Math.PI * 2;',
+      '  value + v * Math.sin(w * t) / Math.exp(decay * t) / w;',
+      '} else {',
+      '  value;',
+      '}'
+    ].join('\n'),
+    description: 'Wobbles past each keyframe and settles, continuing the incoming velocity',
     params: {
-      amplitude: { type: 'number', default: 0.1, description: 'Bounce amplitude' },
-      frequency: { type: 'number', default: 3, description: 'Bounce frequency' },
-      decay: { type: 'number', default: 5, description: 'Decay rate' }
+      frequency: { type: 'number', default: 3, description: 'Oscillations per second. Higher = tighter, smaller overshoot' },
+      decay: { type: 'number', default: 5, description: 'How quickly the wobble dies away' }
+    }
+  },
+  bounce: {
+    // Bounce-back: the property rebounds off the keyframe value like a ball
+    // off a floor - gravity pulls it back, each rebound keeps `elasticity` of
+    // the speed, and rebounds get shorter and more frequent as energy is lost.
+    // The original was a damped-sine overshoot under this name.
+    expression: [
+      PREV_KEY,
+      'var e = {{elasticity}};',
+      'var g = {{gravity}};',
+      'var nMax = {{maxBounces}};',
+      'if (n > 0 && t > 0) {',
+      '  var v = -' + V_IN + ' * e;',
+      '  var isArr = (v instanceof Array);',
+      '  var vl = isArr ? length(v) : Math.abs(v);',
+      '  var vu = isArr ? (vl > 0 ? normalize(v) : v) : (v < 0 ? -1 : 1);',
+      '  var tCur = 0;',
+      '  var seg = 2 * vl / g;',
+      '  var tNext = seg;',
+      '  var nb = 1;',
+      '  while (tNext < t && nb <= nMax) { vl *= e; seg *= e; tCur = tNext; tNext += seg; nb++; }',
+      '  if (nb <= nMax) {',
+      '    var d = t - tCur;',
+      '    value + vu * d * (vl - g * d / 2);',
+      '  } else {',
+      '    value;',
+      '  }',
+      '} else {',
+      '  value;',
+      '}'
+    ].join('\n'),
+    description: 'Rebounds off each keyframe value under gravity, like a ball hitting a floor',
+    params: {
+      elasticity: { type: 'number', default: 0.7, description: 'Fraction of speed kept on each rebound (0-1)' },
+      gravity: { type: 'number', default: 5000, description: 'Pull back toward the keyframe value, in units per second squared' },
+      maxBounces: { type: 'number', default: 9, description: 'Stop after this many rebounds' }
     }
   },
   inertia: {
-    expression: 'var friction = {{friction}};\nvar numKeys = numKeys;\nif (numKeys > 0) {\n  var t = time - key(numKeys).time;\n  if (t > 0) {\n    var v = velocityAtTime(key(numKeys).time - 0.001);\n    value + v * (1 - Math.exp(-friction * t)) / friction;\n  } else {\n    value;\n  }\n} else {\n  value;\n}',
-    description: 'Inertia/momentum after keyframes',
+    // Coasts on in the incoming direction and slows to a stop.
+    expression: [
+      PREV_KEY,
+      'var friction = {{friction}};',
+      'if (n > 0 && t > 0) {',
+      '  var v = ' + V_IN + ';',
+      '  value + v * (1 - Math.exp(-friction * t)) / friction;',
+      '} else {',
+      '  value;',
+      '}'
+    ].join('\n'),
+    description: 'Drifts on past each keyframe in the direction of travel and eases to a stop',
     params: {
-      friction: { type: 'number', default: 5, description: 'Friction coefficient' }
-    }
-  },
-  overshoot: {
-    expression: 'var frequency = {{frequency}};\nvar decay = {{decay}};\nvar numKeys = numKeys;\nif (numKeys > 0) {\n  var t = time - key(numKeys).time;\n  if (t > 0) {\n    var startVal = key(numKeys).value;\n    var endVal = value;\n    var delta = endVal - startVal;\n    endVal + delta * Math.sin(frequency * t * Math.PI) * Math.exp(-decay * t);\n  } else {\n    value;\n  }\n} else {\n  value;\n}',
-    description: 'Overshoot animation effect',
-    params: {
-      frequency: { type: 'number', default: 3, description: 'Oscillation frequency' },
-      decay: { type: 'number', default: 5, description: 'Decay rate' }
+      friction: { type: 'number', default: 5, description: 'How quickly the drift stops' }
     }
   },
   springy: {
-    expression: 'var mass = {{mass}};\nvar stiffness = {{stiffness}};\nvar damping = {{damping}};\nvar numKeys = numKeys;\nif (numKeys > 0) {\n  var t = time - key(numKeys).time;\n  if (t > 0) {\n    var omega = Math.sqrt(stiffness / mass);\n    var zeta = damping / (2 * Math.sqrt(mass * stiffness));\n    var amplitude = velocityAtTime(key(numKeys).time - 0.001) / omega;\n    if (zeta < 1) {\n      var omegaD = omega * Math.sqrt(1 - zeta * zeta);\n      value + amplitude * Math.exp(-zeta * omega * t) * Math.sin(omegaD * t);\n    } else {\n      value;\n    }\n  } else {\n    value;\n  }\n} else {\n  value;\n}',
-    description: 'Spring physics simulation',
+    // Underdamped spring. Divides by the DAMPED frequency wd, which is the one
+    // it oscillates at, so it starts at the incoming velocity. The original
+    // divided by the undamped omega and started about 13% slow.
+    expression: [
+      PREV_KEY,
+      'var mass = {{mass}};',
+      'var stiffness = {{stiffness}};',
+      'var damping = {{damping}};',
+      'if (n > 0 && t > 0) {',
+      '  var omega = Math.sqrt(stiffness / mass);',
+      '  var zeta = damping / (2 * Math.sqrt(mass * stiffness));',
+      '  if (zeta < 1) {',
+      '    var wd = omega * Math.sqrt(1 - zeta * zeta);',
+      '    var v = ' + V_IN + ';',
+      '    value + v / wd * Math.exp(-zeta * omega * t) * Math.sin(wd * t);',
+      '  } else {',
+      '    value;',
+      '  }',
+      '} else {',
+      '  value;',
+      '}'
+    ].join('\n'),
+    description: 'Spring past each keyframe (no effect when critically or over-damped)',
     params: {
       mass: { type: 'number', default: 1, description: 'Mass' },
       stiffness: { type: 'number', default: 100, description: 'Spring stiffness' },
-      damping: { type: 'number', default: 10, description: 'Damping coefficient' }
+      damping: { type: 'number', default: 10, description: 'Damping. Must stay below 2 * sqrt(mass * stiffness) to oscillate' }
+    }
+  },
+
+  // Speed control
+  speedControl: {
+    // Integrates a keyframed "units per second" slider over time. Multiplying
+    // the slider by time instead makes the property run BACKWARDS whenever the
+    // speed eases off, because expressions have no memory of earlier frames.
+    // Areas are exact for linear and hold keyframes; eased keys approximate.
+    expression: [
+      'var s = effect("{{controlName}}")("ADBE Slider Control-0001");',
+      'var mult = {{multiplier}};',
+      'var acc = 0;',
+      'if (s.numKeys > 0) {',
+      '  acc = Math.max(0, Math.min(time, s.key(1).time) - inPoint) * s.key(1).value;',
+      '  var k = 1;',
+      '  while (k < s.numKeys && s.key(k + 1).time <= time) {',
+      '    acc += (s.key(k).value + s.key(k + 1).value) / 2 * (s.key(k + 1).time - s.key(k).time);',
+      '    k++;',
+      '  }',
+      '  if (time > s.key(k).time) {',
+      '    acc += (s.key(k).value + s.valueAtTime(time)) / 2 * (time - s.key(k).time);',
+      '  }',
+      '} else {',
+      '  acc = s.value * Math.max(0, time - inPoint);',
+      '}',
+      'acc *= mult;',
+      'if (value instanceof Array) {',
+      '  var out = [];',
+      '  for (var i = 0; i < value.length; i++) { out.push(value[i] + acc); }',
+      '  out;',
+      '} else {',
+      '  value + acc;',
+      '}'
+    ].join('\n'),
+    description: 'Accumulates a keyframed speed slider over time, so slowing down never reverses the motion. Add a Slider Control first (add_expression_control)',
+    params: {
+      controlName: { type: 'string', default: 'Speed', description: 'Name of the Slider Control on this layer holding units per second' },
+      multiplier: { type: 'number', default: 1, description: 'Scales the accumulated amount (e.g. to convert units)' }
+    }
+  },
+
+  // Wiggle variants
+  loopingWiggle: {
+    // Crossfades a wiggle sampled at t with one sampled at t - loopTime, so the
+    // end of each cycle lands exactly on its start.
+    expression: [
+      'var freq = {{frequency}};',
+      'var amp = {{amplitude}};',
+      'var loopTime = {{loopTime}};',
+      'var t = time % loopTime;',
+      'var w1 = wiggle(freq, amp, 1, 0.5, t);',
+      'var w2 = wiggle(freq, amp, 1, 0.5, t - loopTime);',
+      'linear(t, 0, loopTime, w1, w2);'
+    ].join('\n'),
+    description: 'Wiggle that repeats seamlessly every loopTime seconds',
+    params: {
+      frequency: { type: 'number', default: 2, description: 'Oscillations per second' },
+      amplitude: { type: 'number', default: 50, description: 'Maximum deviation' },
+      loopTime: { type: 'number', default: 3, description: 'Loop length in seconds' }
+    }
+  },
+  wiggleOneAxis: {
+    expression: [
+      'var ax = {{axis}};',
+      'var w = wiggle({{frequency}}, {{amplitude}});',
+      'if (value instanceof Array) {',
+      '  var r = [];',
+      '  for (var i = 0; i < value.length; i++) { r.push(i === ax ? w[i] : value[i]); }',
+      '  r;',
+      '} else {',
+      '  w;',
+      '}'
+    ].join('\n'),
+    description: 'Wiggle along one axis only; the other axes keep their keyframed values',
+    params: {
+      axis: { type: 'number', default: 0, description: '0 = x, 1 = y, 2 = z' },
+      frequency: { type: 'number', default: 2, description: 'Oscillations per second' },
+      amplitude: { type: 'number', default: 50, description: 'Maximum deviation' }
     }
   }
 };
@@ -195,7 +368,25 @@ function processExpressionTemplate(
         ? params[paramName]
         : paramDef.default;
       const placeholder = '{{' + paramName + '}}';
-      expression = expression.split(placeholder).join(String(value));
+      // Values are pasted into expression source, so check them first:
+      //  - number: must be a finite number, not arbitrary text;
+      //  - string: sits inside double quotes, so escape it;
+      //  - expression: deliberately inserted as raw code.
+      let replacement: string;
+      if (paramDef.type === 'number') {
+        const num = typeof value === 'number' ? value : Number(value);
+        if (typeof value === 'boolean' || value === '' || !isFinite(num)) {
+          throw new Error(
+            'Template "' + templateName + '" parameter "' + paramName + '" must be a number, got: ' + JSON.stringify(value)
+          );
+        }
+        replacement = String(num);
+      } else if (paramDef.type === 'string') {
+        replacement = String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      } else {
+        replacement = String(value);
+      }
+      expression = expression.split(placeholder).join(replacement);
     }
   }
 
@@ -324,6 +515,11 @@ export function generateAddExpressionControl(params: {
   controlName: string;
   defaultValue?: number | number[] | boolean | string;
 }): string {
+  // Without this, a missing name was written as the literal text "undefined",
+  // so expressions looking the control up by name could never find it.
+  if (typeof params.controlName !== 'string' || params.controlName === '') {
+    throw new Error('add_expression_control requires controlName - expressions find the control by this name');
+  }
   let script = '';
   script += generateProjectCheck();
   script += generateCompAccess(params.compId, params.compName);

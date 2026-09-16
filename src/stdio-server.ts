@@ -1431,7 +1431,7 @@ const TOOLS = [
   },
   {
     name: 'apply_expression_template',
-    description: 'Apply a pre-built expression template',
+    description: 'Apply a pre-built expression template. The physics templates (overshoot, bounce, inertia, springy) act after every keyframe on the property. speedControl needs a Slider Control on the layer (see add_expression_control).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1444,13 +1444,18 @@ const TOOLS = [
           type: 'string',
           enum: [
             'wiggle', 'wiggleSmooth', 'wiggleFadeIn', 'wiggleFadeOut',
+            'loopingWiggle', 'wiggleOneAxis',
             'loopCycle', 'loopPingpong', 'loopOffset', 'loopContinue',
             'time', 'clock', 'countdown', 'frameNumber',
             'matchPosition', 'offsetPosition', 'inverseRotation', 'followPath',
-            'bounce', 'inertia', 'overshoot', 'springy'
+            'overshoot', 'bounce', 'inertia', 'springy',
+            'speedControl'
           ]
         },
-        params: { type: 'object', description: 'Template parameters' }
+        params: {
+          type: 'object',
+          description: 'Template parameters. overshoot: frequency, decay. bounce: elasticity (0-1), gravity, maxBounces. inertia: friction. springy: mass, stiffness, damping. speedControl: controlName (slider name, units per second), multiplier. loopingWiggle: frequency, amplitude, loopTime. wiggleOneAxis: axis (0 x, 1 y, 2 z), frequency, amplitude. Numeric parameters must be numbers.'
+        }
       },
       required: ['property', 'template']
     },
