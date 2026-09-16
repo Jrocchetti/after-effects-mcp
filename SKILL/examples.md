@@ -93,7 +93,7 @@ set_keyframe(compName="Logo", layerName="logo.png", property="rotation", time=2,
 apply_easy_ease(compName="Logo", layerName="logo.png", property="rotation", type="OUT")
 ```
 
-For a canned animation instead, `create_logo_reveal(compName="Logo", logoItemName="logo.png", style="scale")`.
+For a canned animation instead, `create_logo_reveal(compName="Logo", logoItemName="logo.png", style="scale")`. `style="particle"` assembles the logo out of particles and adds a sparkle burst as it lands.
 
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: ae-mcp
-description: Drive Adobe After Effects through the ae-mcp tools. Use when the user wants to create, edit, animate or render anything in After Effects - compositions, text, shape layers and bezier paths, trim paths and other shape operators, masks, keyframes and easing, expressions, effects, 3D layers with cameras, lights and extrusion, lower thirds, title cards, transitions, logo reveals, markers, and the render queue or Adobe Media Encoder. Trigger on phrases like "in After Effects", "make a motion graphic", "animate this", "add keyframes", "draw on a line", "mask this", "extrude the text", "render this comp", or AE terms like comp, precomp, expression, trim paths, render queue.
+description: Drive Adobe After Effects through the ae-mcp tools. Use when the user wants to create, edit, animate or render anything in After Effects - compositions, text, shape layers and bezier paths, trim paths and other shape operators, masks, keyframes and easing, expressions, effects and particles (CC Particle World, Particle Systems II, Particle Playground), 3D layers with cameras, lights and extrusion, lower thirds, title cards, transitions, logo reveals, markers, and the render queue or Adobe Media Encoder. Trigger on phrases like "in After Effects", "make a motion graphic", "animate this", "add keyframes", "draw on a line", "mask this", "extrude the text", "render this comp", or AE terms like comp, precomp, expression, trim paths, render queue.
 ---
 
 # After Effects MCP
@@ -29,6 +29,9 @@ Keyframe, expression and effect-property tools take a `property` string.
 | `rotationX`, `rotationY`, `rotationZ` | 3D rotation |
 | `sourceText` | Text layer Source Text |
 | `audioLevels` | Audio levels |
+| `pointOfInterest` | Camera point of interest (AE stores it as the camera's anchor point) |
+| `zoom`, `focusDistance`, `aperture` | Camera options |
+| `lightIntensity`, `lightColor`, `coneAngle`, `coneFeather`, `castsShadows`, `shadowDarkness`, `shadowDiffusion` | Light options |
 
 English display names (`"Position"`, `"Rotation"`, `"Source Text"`) also work on an English install.
 
@@ -126,7 +129,7 @@ If one of these refuses with "Nothing was changed", the keyframes are untouched 
 - `create_lower_third` - `style` (`modern`, `corporate`, `news`, `minimal`, `social`), `position` (`bottomLeft`, `bottomRight`, `bottomCenter`). **`name` is the name of the precomp it builds**; `title` is the main line and `subtitle` the second. It adds one precomp layer to the target comp.
 - `create_title_card` - `style`: `cinematic`, `documentary`, `social`, `minimal`.
 - `create_transition` - `type`: `wipe_left`, `wipe_right`, `wipe_up`, `wipe_down`, `dissolve`, `push`, `slide`, `zoom`; `easing`: `linear`, `easeIn`, `easeOut`, `easeInOut`.
-- `create_logo_reveal` - needs an **already imported** logo (`logoItemName` or `logoItemId`). `style`: `fade`, `scale`, `slide`, `spin`, `glitch`. Avoid `particle`: it is listed but not implemented, so the logo gets no animation.
+- `create_logo_reveal` - needs an **already imported** logo (`logoItemName` or `logoItemId`). `style`: `fade`, `scale`, `slide`, `spin`, `glitch`, `particle`. `particle` assembles the logo out of particles with CC Scatterize and fires a soft CC Particle Systems II burst as it lands. The burst goes on its own solid, "Logo Particles", and the result says whether it was added.
 - `create_text_animator` - needs a text layer (`layerName`); `animatorType`: `typewriter`, `fadeInChars`, `scaleInChars`, `slideInChars`, `randomize`, `wave`; optional `duration`, `delay`.
 
 ## Effects and expressions
@@ -134,21 +137,32 @@ If one of these refuses with "Nothing was changed", the keyframes are untouched 
 - `apply_effect` - `effect` is the effect's English name (`"Gaussian Blur"`, `"Glow"`, `"Gradient Ramp"`, `"Turbulent Displace"`).
 - `apply_effect_template` - `template`: `gaussianBlur`, `directionalBlur`, `glassBlur`, `curves`, `colorBalance`, `brightnessContrast`, `vibrance`, `glow`, `dropShadow`, `vignette`, `cinematicLook`, `vhsRetro`, `neonGlow`, `filmGrain`, `chromaticAberration`, `duotone`; optional `intensity`.
 - `apply_expression_template` - `template`: `wiggle`, `wiggleSmooth`, `wiggleFadeIn`, `wiggleFadeOut`, `loopCycle`, `loopPingpong`, `loopOffset`, `loopContinue`, `time`, `clock`, `countdown`, `frameNumber`, `matchPosition`, `offsetPosition`, `inverseRotation`, `followPath`, `bounce`, `inertia`, `overshoot`, `springy`. Pass settings in `params`: `wiggle` takes `frequency` and `amplitude`; `bounce` takes `amplitude`, `frequency` and `decay`; `springy` takes `mass`, `stiffness` and `damping`. Unknown keys are ignored.
+- **Effect parameter lists are flat and reuse names.** Particle Playground has a dozen `Position`, `Affects`, `Min` and `Max` entries; CC Particle World has two `Distance`s. A display-name path such as `Effects/Particle Playground/Position` silently hits the first one. Use the parameter's match name as the last path segment instead: `Effects/CC Particle Systems II/CC Particle Systems II-0001`.
 - `link_properties` - `offset` is **added** to the linked value. It shifts a layer; it cannot scale motion. For parallax or other multipliers, write the expression with `set_expression`.
 - In your own expressions, use `value` for the pre-expression value and `thisComp.layer("Name")` to reference other layers.
+
+## Particles
+
+There is no particle API in ExtendScript. Particles come from the bundled effects, added with `apply_effect` like any other effect: `CC Particle World`, `CC Particle Systems II`, `Particle Playground`, and effects that break a layer apart - `CC Scatterize`, `CC Pixel Polly`, `Shatter`. Emitters (Particle World, Particle Systems II, Playground) replace the layer they sit on, so put them on their own solid, usually with `blendMode: ADD`.
+
+CC Particle Systems II behaves in ways that aren't obvious (match names in brackets):
+- **Radius X/Y (`-0005`/`-0006`) and Velocity (`-0010`) are relative, not pixels.** On a 1920-wide layer one radius unit is roughly 10 px, so a radius of 30 surrounds a mid-size logo and 100 fills the frame. Keep velocity well under 1 on a comp-sized solid.
+- **Particle Type (`-0018`) is a numbered menu**: 1 lines (the default), 2 stars, 4 shaded spheres, **5 faded spheres (soft dots)**, 7 bubbles, 10-15 polygon shards, 17-19 large bokeh lenses. 3, 8 and 16 are menu separators and render almost nothing.
+- Birth Rate (`-0001`) runs 0-1000 and is continuous. For a burst, keyframe it on and off with HOLD keyframes.
+
+Check a particle setup with `render_frame` before calling it done - these parameters are hard to judge any other way.
 
 ## Rendering
 
 - Call `list_render_templates` first and use the user's existing presets by name.
 - `add_to_render_queue` - `outputPath`, `renderSettingsTemplate`, `outputModuleTemplate`, `timeSpanStart`, `timeSpanDuration`. **The output module decides the file type**: a `.mov` path with an H.264 module produces `.mp4`. Report the returned `outputPath`.
 - **`control_render` with `action: "start"` blocks After Effects until the whole queue finishes**, so the call will usually time out on a real render. Prefer `queue_in_ame` (`renderImmediately: true` to start encoding), which returns straight away. Poll `list_render_queue` for status.
-- `render_frame` saves a single still, which is useful for checking your work.
+- `render_frame` saves a single PNG (`time`, optional `outputDir` and `fileName`) and waits until the file is fully written. Use it to check your work.
 
 ## Known issues
 
 - **`precompose_layers` is broken.** It moves the layers into the new precomp and then errors. If you must use it, check the result with `list_layers` afterwards.
 - `delete_composition` does not delete the solids that comp used. They stay in the project's Solids folder.
-- `create_logo_reveal` style `particle` does nothing (see Templates).
 
 ## Common errors
 
