@@ -530,6 +530,7 @@ export function generateModifyLayer(params: {
   blendMode?: string;
   parent?: number;
   is3D?: boolean;
+  collapseTransformation?: boolean;
   position?: { x: number; y: number; z?: number };
   scale?: number[];
   rotation?: number;
@@ -579,6 +580,13 @@ export function generateModifyLayer(params: {
   }
   if (params.is3D !== undefined) {
     script += 'layer.threeDLayer = ' + params.is3D + ';\n';
+  }
+  if (params.collapseTransformation !== undefined) {
+    // Precomps, solids and vector layers can collapse; raster footage can't.
+    script += 'if (!layer.canSetCollapseTransformation) {\n';
+    script += '  throw new Error("Collapse Transformations is not available on this layer (raster footage can\'t collapse; use the Grow Bounds effect to give effects more room): " + layer.name);\n';
+    script += '}\n';
+    script += 'layer.collapseTransformation = ' + (params.collapseTransformation ? 'true' : 'false') + ';\n';
   }
   if (params.position) {
     script += 'layer.property("Position").setValue(' + positionToES3(params.position) + ');\n';

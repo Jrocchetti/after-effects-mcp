@@ -499,12 +499,28 @@ export function generateCreateLogoReveal(params: {
     script += 'if (!logoFx.canAddProperty("CC Scatterize")) {\n';
     script += '  throw new Error("CC Scatterize is not available in this After Effects install");\n';
     script += '}\n';
+    // Effects are clipped to the layer's own bounds, so Scatterize on a tight
+    // logo just fills that rectangle with noise. Give it room first:
+    //  - precomps (and solids / vectors) can use Collapse Transformations,
+    //    which renders their effects in this comp's space;
+    //  - raster footage such as a PNG can't collapse, so Grow Bounds enlarges
+    //    the layer's buffer instead. It must sit BEFORE Scatterize in the stack.
+    // canSetCollapseTransformation is the reliable test - layer type isn't.
+    script += 'var logoExpanded = "none";\n';
+    script += 'if (logoLayer.canSetCollapseTransformation) {\n';
+    script += '  logoLayer.collapseTransformation = true;\n';
+    script += '  logoExpanded = "collapseTransformation";\n';
+    script += '} else if (logoFx.canAddProperty("ADBE GROW BOUNDS")) {\n';
+    script += '  var grow = logoFx.addProperty("ADBE GROW BOUNDS");\n';
+    script += '  grow.property("ADBE GROW BOUNDS-0001").setValue(Math.round(Math.max(comp.width, comp.height) / 3));\n';
+    script += '  logoExpanded = "growBounds";\n';
+    script += '}\n';
     script += 'var scat = logoFx.addProperty("CC Scatterize");\n';
     script += 'var scatAmount = scat.property("CC Scatterize-0001");\n';
     script += 'var scatTwist = scat.property("CC Scatterize-0002");\n';
-    // Scatterize can't move pixels outside the logo layer's bounds, so a large
-    // value just fills that rectangle with noise. Keep it modest.
-    script += 'scatAmount.setValueAtTime(0, 150);\n';
+    // With room to spread, a bigger scatter reads as a particle cloud. Without
+    // it, keep the value modest so the clipped rectangle stays faint.
+    script += 'scatAmount.setValueAtTime(0, logoExpanded === "none" ? 150 : 450);\n';
     script += 'scatAmount.setValueAtTime(' + land + ', 0);\n';
     script += 'scatTwist.setValueAtTime(0, 180);\n';
     script += 'scatTwist.setValueAtTime(' + land + ', 0);\n';
@@ -570,6 +586,7 @@ export function generateCreateLogoReveal(params: {
   if (style === 'particle') {
     resultProps.particleLayer = 'burst ? burst.name : null';
     resultProps.particleBurstAdded = 'particleFxOk';
+    resultProps.logoBoundsExpandedBy = 'logoExpanded';
   }
   script += generateResultObject(resultProps);
 

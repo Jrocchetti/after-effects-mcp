@@ -1090,6 +1090,7 @@ const TOOLS = [
         blendMode: { type: 'string' },
         parent: { type: 'number' },
         is3D: { type: 'boolean' },
+        collapseTransformation: { type: 'boolean', description: 'Collapse Transformations / Continuously Rasterize. On a precomp layer, effects then render in this comp\'s space instead of being clipped to the precomp\'s bounds. Not available on raster footage.' },
         position: { type: 'object' },
         scale: { type: 'array', items: { type: 'number' } },
         rotation: { type: 'number' },
