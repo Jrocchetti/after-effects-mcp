@@ -30,13 +30,19 @@ set_keyframe(compName="Ball", layerName="Ball", property="scale", time=1,   valu
 set_keyframe(compName="Ball", layerName="Ball", property="scale", time=1.1, value=[100, 100])
 ```
 
-Alternative - let an expression do the bounce after the last key:
+Alternative - keyframe only the fall and let the `bounce` template add the rebounds. Each rebound keeps `elasticity` of the speed, and they get shorter as it loses energy:
 
 ```
+set_keyframe(compName="Ball", layerName="Ball", property="position", time=0, value=[960, 200])
+set_keyframe(compName="Ball", layerName="Ball", property="position", time=1, value=[960, 900])
 apply_expression_template(compName="Ball", layerName="Ball", property="position",
                           template="bounce",
-                          params={"amplitude": 0.1, "frequency": 3, "decay": 5})
+                          params={"elasticity": 0.7, "gravity": 1500, "maxBounces": 9})
 ```
+
+This linear fall lands at 700 px/s, and gives a first rebound of about 80 px and seven rebounds in all. Rebound height is speed² / (2 × gravity): lower gravity or a faster landing gives bigger bounces. **Don't easy-ease the landing key** - the ball would arrive at zero speed and not bounce at all.
+
+For a settle-and-wobble instead of a bounce, use `template="overshoot"` with `params={"frequency": 3, "decay": 5}`.
 
 ---
 
@@ -277,6 +283,29 @@ remove_from_render_queue(all=true)
 ```
 
 Timeline: the text fades in as a particle cloud, forms letters by about 1.7 s, lands at 2 s (half the duration) with the burst, and holds from there. The source comp layer gets Collapse Transformations automatically, so the scatter isn't clipped to the 1500x340 box.
+
+---
+
+## 11. Speed ramp without the rewind
+
+Spinning something from a keyframed speed. Multiplying the slider by `time` makes it spin backwards as soon as the speed eases off; `speedControl` accumulates the speed instead.
+
+```
+add_null_layer(compName="Scene", name="Wheel")
+add_expression_control(compName="Scene", layerName="Wheel",
+                       controlType="slider", controlName="Speed")
+
+# Speed in degrees per second: spin up, hold, spin down
+set_keyframe(compName="Scene", layerName="Wheel", property="Effects/Speed/Slider", time=0, value=0)
+set_keyframe(compName="Scene", layerName="Wheel", property="Effects/Speed/Slider", time=1, value=360)
+set_keyframe(compName="Scene", layerName="Wheel", property="Effects/Speed/Slider", time=2, value=360)
+set_keyframe(compName="Scene", layerName="Wheel", property="Effects/Speed/Slider", time=3, value=0)
+
+apply_expression_template(compName="Scene", layerName="Wheel", property="rotation",
+                          template="speedControl", params={"controlName": "Speed"})
+```
+
+Rotation runs 0 → 180° at 1 s → 540° at 2 s → 720° at 3 s, then holds at 720°.
 
 ---
 
