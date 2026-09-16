@@ -241,6 +241,45 @@ Avoid `control_render(action="start")` for anything long - it blocks After Effec
 
 ---
 
+## 10. Particle text reveal
+
+Text assembling out of particles, then a sparkle burst as it lands. The reveal treats a comp as its "logo", so the text goes in its own tight comp first.
+
+```
+# 1. The text, in a comp just big enough to hold it
+create_composition(name="Particle Text - Source", width=1500, height=340, frameRate=30, duration=4)
+add_text_layer(compName="Particle Text - Source", name="Title", text="MOTION", fontSize=240,
+               justification="CENTER", color={"r": 1, "g": 1, "b": 1},
+               position={"x": 750, "y": 255})
+
+# 2. The main comp and the reveal
+create_composition(name="Particle Text Reveal", width=1920, height=1080, frameRate=30, duration=4)
+create_logo_reveal(compName="Particle Text Reveal", logoItemName="Particle Text - Source",
+                   style="particle", duration=4,
+                   backgroundColor={"r": 0.03, "g": 0.035, "b": 0.07})
+# -> logoBoundsExpandedBy: "collapseTransformation", particleBurstAdded: true
+
+# 3. A slow push-in so the end frame doesn't sit dead
+set_keyframe(compName="Particle Text Reveal", layerName="Particle Text - Source",
+             property="scale", time=0, value=[92, 92])
+set_keyframe(compName="Particle Text Reveal", layerName="Particle Text - Source",
+             property="scale", time=4, value=[100, 100])
+
+set_active_composition(compName="Particle Text Reveal")
+
+# 4. Preview - through the render queue, not frame by frame
+add_to_render_queue(compName="Particle Text Reveal",
+                    outputPath="D:/Previews/particle_text_reveal.mp4",
+                    renderSettingsTemplate="Best Settings",
+                    outputModuleTemplate="H.264 - Match Render Settings - 15 Mbps")
+control_render(action="start")        # a 4 s comp takes a few seconds
+remove_from_render_queue(all=true)
+```
+
+Timeline: the text fades in as a particle cloud, forms letters by about 1.7 s, lands at 2 s (half the duration) with the burst, and holds from there. The source comp layer gets Collapse Transformations automatically, so the scatter isn't clipped to the 1500x340 box.
+
+---
+
 ## Timing and easing
 
 | Use | Duration | Easing |

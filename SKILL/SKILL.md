@@ -129,12 +129,12 @@ If one of these refuses with "Nothing was changed", the keyframes are untouched 
 - `create_lower_third` - `style` (`modern`, `corporate`, `news`, `minimal`, `social`), `position` (`bottomLeft`, `bottomRight`, `bottomCenter`). **`name` is the name of the precomp it builds**; `title` is the main line and `subtitle` the second. It adds one precomp layer to the target comp.
 - `create_title_card` - `style`: `cinematic`, `documentary`, `social`, `minimal`.
 - `create_transition` - `type`: `wipe_left`, `wipe_right`, `wipe_up`, `wipe_down`, `dissolve`, `push`, `slide`, `zoom`; `easing`: `linear`, `easeIn`, `easeOut`, `easeInOut`.
-- `create_logo_reveal` - needs an **already imported** logo (`logoItemName` or `logoItemId`). `style`: `fade`, `scale`, `slide`, `spin`, `glitch`, `particle`. `particle` assembles the logo out of particles with CC Scatterize and fires a soft CC Particle Systems II burst as it lands. The burst goes on its own solid, "Logo Particles", and the result says whether it was added.
+- `create_logo_reveal` - needs an **already imported** logo (`logoItemName` or `logoItemId`). `style`: `fade`, `scale`, `slide`, `spin`, `glitch`, `particle`. `particle` assembles the logo out of particles with CC Scatterize and fires a soft CC Particle Systems II burst as it lands. For text, put the text in its own comp first and pass that comp as `logoItemName`. The burst goes on its own solid, "Logo Particles", and the result says whether it was added.
 - `create_text_animator` - needs a text layer (`layerName`); `animatorType`: `typewriter`, `fadeInChars`, `scaleInChars`, `slideInChars`, `randomize`, `wave`; optional `duration`, `delay`.
 
 ## Effects and expressions
 
-- `apply_effect` - `effect` is the effect's English name (`"Gaussian Blur"`, `"Glow"`, `"Gradient Ramp"`, `"Turbulent Displace"`).
+- `apply_effect` - `effect` is the effect's English name (`"Gaussian Blur"`, `"Glow"`, `"Gradient Ramp"`, `"Turbulent Displace"`) or its match name (`"ADBE Gaussian Blur 2"`). **Third-party plugins can share a display name** with a built-in effect, and the name resolves to whichever loads first. Check the `matchName` in the result, and pass the match name when it matters.
 - `apply_effect_template` - `template`: `gaussianBlur`, `directionalBlur`, `glassBlur`, `curves`, `colorBalance`, `brightnessContrast`, `vibrance`, `glow`, `dropShadow`, `vignette`, `cinematicLook`, `vhsRetro`, `neonGlow`, `filmGrain`, `chromaticAberration`, `duotone`; optional `intensity`.
 - `apply_expression_template` - `template`: `wiggle`, `wiggleSmooth`, `wiggleFadeIn`, `wiggleFadeOut`, `loopCycle`, `loopPingpong`, `loopOffset`, `loopContinue`, `time`, `clock`, `countdown`, `frameNumber`, `matchPosition`, `offsetPosition`, `inverseRotation`, `followPath`, `bounce`, `inertia`, `overshoot`, `springy`. Pass settings in `params`: `wiggle` takes `frequency` and `amplitude`; `bounce` takes `amplitude`, `frequency` and `decay`; `springy` takes `mass`, `stiffness` and `damping`. Unknown keys are ignored.
 - **Effect parameter lists are flat and reuse names.** Particle Playground has a dozen `Position`, `Affects`, `Min` and `Max` entries; CC Particle World has two `Distance`s. A display-name path such as `Effects/Particle Playground/Position` silently hits the first one. Use the parameter's match name as the last path segment instead: `Effects/CC Particle Systems II/CC Particle Systems II-0001`.
@@ -150,7 +150,13 @@ CC Particle Systems II behaves in ways that aren't obvious (match names in brack
 - **Particle Type (`-0018`) is a numbered menu**: 1 lines (the default), 2 stars, 4 shaded spheres, **5 faded spheres (soft dots)**, 7 bubbles, 10-15 polygon shards, 17-19 large bokeh lenses. 3, 8 and 16 are menu separators and render almost nothing.
 - Birth Rate (`-0001`) runs 0-1000 and is continuous. For a burst, keyframe it on and off with HOLD keyframes.
 
-Check a particle setup with `render_frame` before calling it done - these parameters are hard to judge any other way.
+**Effects are clipped to their layer's bounds.** Scatterize or a glow on a tight precomp fills that rectangle and stops. To give an effect room:
+- **Precomps, solids and vector layers:** `modify_layer` with `collapseTransformation: true` renders the layer's effects in the parent comp's space.
+- **Raster footage (PNG, JPG, video)** can't collapse. Add `apply_effect(effect="ADBE GROW BOUNDS")` *before* the effect that needs room, and set its Pixels (`Effects/ADBE GROW BOUNDS/ADBE GROW BOUNDS-0001`). Use the match name: Red Giant's plugin is also called "Grow Bounds", and the display name picks whichever loads first.
+
+`create_logo_reveal` style `particle` does this automatically and reports which method it used in `logoBoundsExpandedBy`.
+
+Check a particle setup with `render_frame` before calling it done - these parameters are hard to judge any other way. For a full preview, **render through the render queue** rather than frame by frame: a single particle frame has to re-simulate from time 0, so 30 frames via `render_frame` took minutes, while a 4-second comp rendered through the queue in 4 seconds.
 
 ## Rendering
 
