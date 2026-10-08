@@ -142,7 +142,8 @@ export function validatePathPoints(
   }
   for (let i = 0; i < vertices.length; i++) {
     const v = vertices[i];
-    if (!Array.isArray(v) || v.length !== 2 || typeof v[0] !== 'number' || typeof v[1] !== 'number') {
+    if (!Array.isArray(v) || v.length !== 2 || typeof v[0] !== 'number' || typeof v[1] !== 'number' ||
+        !Number.isFinite(v[0]) || !Number.isFinite(v[1])) {
       throw new Error('vertices[' + i + '] must be a numeric [x, y] pair');
     }
   }
@@ -153,7 +154,8 @@ export function validatePathPoints(
     }
     for (let i = 0; i < t.length; i++) {
       const p = t[i];
-      if (!Array.isArray(p) || p.length !== 2 || typeof p[0] !== 'number' || typeof p[1] !== 'number') {
+      if (!Array.isArray(p) || p.length !== 2 || typeof p[0] !== 'number' || typeof p[1] !== 'number' ||
+          !Number.isFinite(p[0]) || !Number.isFinite(p[1])) {
         throw new Error(label + '[' + i + '] must be a numeric [x, y] pair');
       }
     }
@@ -419,8 +421,8 @@ export function generateSetPathKeyframes(params: {
   }
   for (let i = 0; i < params.keyframes.length; i++) {
     const kf = params.keyframes[i];
-    if (typeof kf.time !== 'number') {
-      throw new Error('keyframes[' + i + '].time must be a number');
+    if (typeof kf.time !== 'number' || !Number.isFinite(kf.time)) {
+      throw new Error('keyframes[' + i + '].time must be a finite number');
     }
     validatePathPoints(kf.vertices, kf.inTangents, kf.outTangents);
   }

@@ -142,11 +142,12 @@ If one of these refuses with "Nothing was changed", the keyframes are untouched 
   - Linking: `matchPosition`, `offsetPosition`, `inverseRotation`, `followPath`.
   - **Physics - these act after every keyframe on the property:**
     - `overshoot` wobbles past each key and settles (`frequency`, `decay`). Higher frequency means a smaller, tighter overshoot.
-    - `bounce` rebounds off each key value like a ball off a floor (`elasticity` 0-1, `gravity`, `maxBounces`). For a dropped object, keyframe only the fall and let the template add the rebounds.
+    - `bounce` retains the original bouncy-overshoot parameters (`amplitude`, `frequency`, `decay`).
+    - `bounceBack` rebounds off each key value like a ball off a floor (`elasticity` 0-1, `gravity`, `maxBounces`). For a dropped object, keyframe only the fall and let the template add the rebounds.
     - `inertia` drifts on past each key and eases to a stop (`friction`).
     - `springy` springs past each key (`mass`, `stiffness`, `damping`; damping must stay below 2 x sqrt(mass x stiffness) or nothing happens).
-    - All four take their size from how fast the property arrives at the key, so a key with no incoming motion gets no effect - including a key with easy ease on its incoming side.
-  - `speedControl` accumulates a keyframed speed slider (units per second) over time, so easing the speed down slows the property instead of running it backwards - the trap with `slider * time`. Add the slider first with `add_expression_control(controlType="slider", controlName="Speed")`; `params`: `controlName`, `multiplier`. Exact for linear and hold keys, approximate for eased ones. On array properties such as Scale it adds to every dimension.
+    - All five take their size from how fast the property arrives at the key, so a key with no incoming motion gets no effect - including a key with easy ease on its incoming side.
+  - `speedControl` accumulates a keyframed speed slider (units per second) from the layer's `inPoint`. Add the slider first with `add_expression_control(controlType="slider", controlName="Speed")`; `params`: `controlName`, `multiplier`. Exact for linear and HOLD keys, including intervals clipped by trimming. Eased keys use a midpoint approximation; use linear/HOLD keys when accurate integration matters. On array properties such as Scale it adds to every dimension.
 - **Effect parameter lists are flat and reuse names.** Particle Playground has a dozen `Position`, `Affects`, `Min` and `Max` entries; CC Particle World has two `Distance`s. A display-name path such as `Effects/Particle Playground/Position` silently hits the first one. Use the parameter's match name as the last path segment instead: `Effects/CC Particle Systems II/CC Particle Systems II-0001`.
 - `link_properties` - `offset` is **added** to the linked value. It shifts a layer; it cannot scale motion. For parallax or other multipliers, write the expression with `set_expression`.
 - In your own expressions, use `value` for the pre-expression value and `thisComp.layer("Name")` to reference other layers.

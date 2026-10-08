@@ -295,12 +295,14 @@ export function generateRenderFrame(params: {
   script += '}\n';
   // Remove any previous render first. Otherwise an old file satisfies the
   // existence check below even when nothing new was written.
-  script += 'if (outFile.exists) { outFile.remove(); }\n';
+  script += 'if (outFile.exists && !outFile.remove()) {\n';
+  script += '  throw new Error("Cannot remove the previous frame render: " + outFile.fsName);\n';
+  script += '}\n';
   script += 'comp.saveFrameToPng(t, outFile);\n';
   // saveFrameToPng returns BEFORE the file is on disk (measured on AE 26.5: it
   // appears ~50 ms later). Checking immediately reported every render as a
   // failure. Wait for the file to appear, then for its size to stop changing,
-  // so the caller never reads a half-written PNG.
+  // as a best-effort check for an incomplete write.
   script += 'var waitedMs = 0;\n';
   script += 'while (!outFile.exists && waitedMs < 15000) { $.sleep(50); waitedMs += 50; }\n';
   script += 'if (!outFile.exists) {\n';
@@ -311,6 +313,9 @@ export function generateRenderFrame(params: {
   script += '  $.sleep(50); waitedMs += 50;\n';
   script += '  if (outFile.length > 0 && outFile.length === lastSize) { stableChecks++; } else { stableChecks = 0; }\n';
   script += '  lastSize = outFile.length;\n';
+  script += '}\n';
+  script += 'if (stableChecks < 3 || !outFile.exists || outFile.length <= 0) {\n';
+  script += '  throw new Error("Frame render did not finish writing within 15s: " + outFile.fsName);\n';
   script += '}\n';
 
   script += generateResultObject({

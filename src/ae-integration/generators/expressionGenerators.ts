@@ -182,6 +182,28 @@ const EXPRESSION_TEMPLATES: Record<string, {
     }
   },
   bounce: {
+    // Preserve the existing amplitude/frequency/decay API. The gravity-based
+    // rebound is a separate template, not a silent replacement for this one.
+    expression: [
+      PREV_KEY,
+      'var amplitude = {{amplitude}};',
+      'var frequency = {{frequency}};',
+      'var decay = {{decay}};',
+      'if (n > 0 && t > 0) {',
+      '  var v = ' + V_IN + ';',
+      '  value + v * amplitude * Math.sin(frequency * t * 2 * Math.PI) / Math.exp(decay * t);',
+      '} else {',
+      '  value;',
+      '}'
+    ].join('\n'),
+    description: 'Bouncy overshoot after each keyframe, using the original amplitude/frequency/decay parameters',
+    params: {
+      amplitude: { type: 'number', default: 0.1, description: 'Bounce amplitude' },
+      frequency: { type: 'number', default: 3, description: 'Bounce frequency' },
+      decay: { type: 'number', default: 5, description: 'Decay rate' }
+    }
+  },
+  bounceBack: {
     // Bounce-back: the property rebounds off the keyframe value like a ball
     // off a floor - gravity pulls it back, each rebound keeps `elasticity` of
     // the speed, and rebounds get shorter and more frequent as energy is lost.
@@ -271,23 +293,23 @@ const EXPRESSION_TEMPLATES: Record<string, {
     // Integrates a keyframed "units per second" slider over time. Multiplying
     // the slider by time instead makes the property run BACKWARDS whenever the
     // speed eases off, because expressions have no memory of earlier frames.
-    // Areas are exact for linear and hold keyframes; eased keys approximate.
+    // Midpoint areas are exact for linear and HOLD intervals; eased keys are
+    // approximate. Sampling inside an interval avoids the discontinuity at a
+    // HOLD key's right endpoint. Clip every interval to the visible start.
     expression: [
       'var s = effect("{{controlName}}")("ADBE Slider Control-0001");',
       'var mult = {{multiplier}};',
       'var acc = 0;',
-      'if (s.numKeys > 0) {',
-      '  acc = Math.max(0, Math.min(time, s.key(1).time) - inPoint) * s.key(1).value;',
-      '  var k = 1;',
-      '  while (k < s.numKeys && s.key(k + 1).time <= time) {',
-      '    acc += (s.key(k).value + s.key(k + 1).value) / 2 * (s.key(k + 1).time - s.key(k).time);',
-      '    k++;',
+      'var start = inPoint;',
+      'if (time > start) {',
+      '  for (var k = 1; k <= s.numKeys && start < time; k++) {',
+      '    var end = Math.min(time, s.key(k).time);',
+      '    if (end > start) {',
+      '      acc += s.valueAtTime((start + end) / 2) * (end - start);',
+      '      start = end;',
+      '    }',
       '  }',
-      '  if (time > s.key(k).time) {',
-      '    acc += (s.key(k).value + s.valueAtTime(time)) / 2 * (time - s.key(k).time);',
-      '  }',
-      '} else {',
-      '  acc = s.value * Math.max(0, time - inPoint);',
+      '  if (start < time) { acc += s.valueAtTime((start + time) / 2) * (time - start); }',
       '}',
       'acc *= mult;',
       'if (value instanceof Array) {',
@@ -298,7 +320,7 @@ const EXPRESSION_TEMPLATES: Record<string, {
       '  value + acc;',
       '}'
     ].join('\n'),
-    description: 'Accumulates a keyframed speed slider over time, so slowing down never reverses the motion. Add a Slider Control first (add_expression_control)',
+    description: 'Accumulates a speed slider from the layer inPoint. Exact for linear and HOLD keys; midpoint approximation for eased keys. Use linear/HOLD keys for predictable speed integration. Add a Slider Control first (add_expression_control)',
     params: {
       controlName: { type: 'string', default: 'Speed', description: 'Name of the Slider Control on this layer holding units per second' },
       multiplier: { type: 'number', default: 1, description: 'Scales the accumulated amount (e.g. to convert units)' }
@@ -375,14 +397,15 @@ function processExpressionTemplate(
       let replacement: string;
       if (paramDef.type === 'number') {
         const num = typeof value === 'number' ? value : Number(value);
-        if (typeof value === 'boolean' || value === '' || !isFinite(num)) {
+        if ((typeof value !== 'number' && typeof value !== 'string') ||
+            (typeof value === 'string' && value.trim() === '') || !isFinite(num)) {
           throw new Error(
             'Template "' + templateName + '" parameter "' + paramName + '" must be a number, got: ' + JSON.stringify(value)
           );
         }
         replacement = String(num);
       } else if (paramDef.type === 'string') {
-        replacement = String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+        replacement = escapeString(String(value)).replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
       } else {
         replacement = String(value);
       }

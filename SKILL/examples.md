@@ -30,13 +30,13 @@ set_keyframe(compName="Ball", layerName="Ball", property="scale", time=1,   valu
 set_keyframe(compName="Ball", layerName="Ball", property="scale", time=1.1, value=[100, 100])
 ```
 
-Alternative - keyframe only the fall and let the `bounce` template add the rebounds. Each rebound keeps `elasticity` of the speed, and they get shorter as it loses energy:
+Alternative - keyframe only the fall and let the `bounceBack` template add the rebounds. Each rebound keeps `elasticity` of the speed, and they get shorter as it loses energy:
 
 ```
 set_keyframe(compName="Ball", layerName="Ball", property="position", time=0, value=[960, 200])
 set_keyframe(compName="Ball", layerName="Ball", property="position", time=1, value=[960, 900])
 apply_expression_template(compName="Ball", layerName="Ball", property="position",
-                          template="bounce",
+                          template="bounceBack",
                           params={"elasticity": 0.7, "gravity": 1500, "maxBounces": 9})
 ```
 

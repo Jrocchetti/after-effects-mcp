@@ -342,8 +342,8 @@ export function generateSetMaskKeyframes(params: {
   }
   for (let i = 0; i < params.keyframes.length; i++) {
     const kf = params.keyframes[i];
-    if (typeof kf.time !== 'number') {
-      throw new Error('keyframes[' + i + '].time must be a number');
+    if (typeof kf.time !== 'number' || !Number.isFinite(kf.time)) {
+      throw new Error('keyframes[' + i + '].time must be a finite number');
     }
     validatePathPoints(kf.vertices, kf.inTangents, kf.outTangents);
   }
@@ -404,17 +404,20 @@ export function generateSetMaskProperties(params: {
   // Unlock first so the other assignments are not rejected, then re-apply the
   // requested lock state at the end.
   script += 'var wasLocked = mask.locked;\n';
-  script += 'if (wasLocked) { mask.locked = false; }\n';
+  script += 'try {\n';
+  script += '  if (wasLocked) { mask.locked = false; }\n';
 
   const settings = { ...params };
   delete settings.locked;
   script += emitMaskSettings(settings);
+  script += '} finally {\n';
 
   if (params.locked !== undefined) {
     script += 'mask.locked = ' + (params.locked ? 'true' : 'false') + ';\n';
   } else {
     script += 'mask.locked = wasLocked;\n';
   }
+  script += '}\n';
 
   script += generateResultObject({
     layerName: 'layer.name',

@@ -312,13 +312,16 @@ export function generateOffsetKeyframes(params: {
   script += 'var earliest = null;\n';
   script += 'for (var i = 0; i < keyData.length; i++) {\n';
   script += '  keyData[i].newTime = keyData[i].time + offset;\n';
+  script += '  if (!isFinite(keyData[i].newTime) || (i > 0 && keyData[i].newTime <= keyData[i - 1].newTime)) {\n';
+  script += '    throw new Error("Offset would produce non-finite or overlapping key times. Nothing was changed.");\n';
+  script += '  }\n';
   script += '  if (earliest === null || keyData[i].newTime < earliest) { earliest = keyData[i].newTime; }\n';
   script += '}\n';
   script += 'if (earliest < 0) {\n';
   script += '  throw new Error("Offset " + offset + " would move a keyframe before time 0 (it would land at " + earliest + "s). Nothing was changed.");\n';
   script += '}\n';
 
-  // Safe to rewrite now - no key can be lost.
+  // All destination times are valid before rewriting any keys.
   script += 'while (prop.numKeys > 0) {\n';
   script += '  prop.removeKey(1);\n';
   script += '}\n';
@@ -390,22 +393,23 @@ export function generateScaleKeyframeTiming(params: {
   // used to remove all keys first and re-add only those it could place, so
   // a missing scale (NaN) or a key pushed before 0 wiped the animation while
   // reporting success.
-  script += 'var seenFrames = {};\n';
   script += 'for (var i = 0; i < keyData.length; i++) {\n';
   script += '  var nt = anchorTime + (keyData[i].time - anchorTime) * scaleFactor;\n';
+  script += '  if (!isFinite(nt)) {\n';
+  script += '    throw new Error("Scaling would produce a non-finite key time. Nothing was changed.");\n';
+  script += '  }\n';
   script += '  if (nt < 0) {\n';
   script += '    throw new Error("Scaling by " + scaleFactor + " around " + anchorTime + "s would move a keyframe before time 0 (to " + nt + "s). Nothing was changed.");\n';
   script += '  }\n';
-  // Keys that land on the same frame merge into one, which also loses data.
-  script += '  var frameNum = Math.round(nt * comp.frameRate);\n';
-  script += '  if (seenFrames[frameNum]) {\n';
-  script += '    throw new Error("Scaling by " + scaleFactor + " would merge two keyframes onto frame " + frameNum + ". Nothing was changed.");\n';
+  // AE supports subframe keys. Only reject times that actually collapse
+  // together through floating-point rounding, not keys in the same frame.
+  script += '  if (i > 0 && nt <= keyData[i - 1].newTime) {\n';
+  script += '    throw new Error("Scaling would produce overlapping key times. Nothing was changed.");\n';
   script += '  }\n';
-  script += '  seenFrames[frameNum] = true;\n';
   script += '  keyData[i].newTime = nt;\n';
   script += '}\n';
 
-  // Safe to rewrite now - no key can be lost.
+  // All destination times are valid before rewriting any keys.
   script += 'while (prop.numKeys > 0) {\n';
   script += '  prop.removeKey(1);\n';
   script += '}\n';
