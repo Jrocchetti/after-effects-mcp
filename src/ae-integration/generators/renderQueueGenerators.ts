@@ -271,18 +271,19 @@ export function generateRemoveFromRenderQueue(params: {
 }
 
 /**
- * Start, stop or pause rendering.
- *
- * NOTE ON 'start': RenderQueue.render() is SYNCHRONOUS. After Effects blocks
- * until the whole queue finishes, so the bridge will not return a response
- * until then and will usually hit its command timeout on any real render. Use
- * queue_in_ame for long jobs, or start the render and poll list_render_queue.
+ * Start synchronous native rendering or show the Render Queue panel.
+ * RenderQueue.render() blocks CEP until the queue finishes: the bridge cannot
+ * poll, stop, pause or resume it. A command timeout does NOT cancel the render.
+ * Use queue_in_ame for long jobs and AE's UI to interrupt native rendering.
  */
 export function generateControlRender(params: {
   action: 'start' | 'stop' | 'pause' | 'resume' | 'showWindow';
 }): string {
   const action = params.action;
-  const valid = ['start', 'stop', 'pause', 'resume', 'showWindow'];
+  if (['stop', 'pause', 'resume'].indexOf(action) !== -1) {
+    throw new Error('The CEP bridge cannot stop, pause or resume a synchronous native render. Use After Effects UI controls or queue_in_ame for long jobs.');
+  }
+  const valid = ['start', 'showWindow'];
   if (valid.indexOf(action) === -1) {
     throw new Error('action must be one of: ' + valid.join(', '));
   }
@@ -295,12 +296,6 @@ export function generateControlRender(params: {
   if (action === 'start') {
     script += 'if (rq.numItems === 0) { throw new Error("Render queue is empty"); }\n';
     script += 'rq.render();\n';
-  } else if (action === 'stop') {
-    script += 'rq.stopRendering();\n';
-  } else if (action === 'pause') {
-    script += 'rq.pauseRendering(true);\n';
-  } else if (action === 'resume') {
-    script += 'rq.pauseRendering(false);\n';
   } else {
     script += 'rq.showWindow(true);\n';
   }

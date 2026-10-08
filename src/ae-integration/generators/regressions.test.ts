@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import vm from 'node:vm';
-import { generateApplyExpressionTemplate, getExpressionTemplates } from './expressionGenerators.js';
+import { generateApplyExpressionTemplate, generateBatchSetExpressions, getExpressionTemplates } from './expressionGenerators.js';
+import { generateControlRender } from './renderQueueGenerators.js';
 import { generateScaleKeyframeTiming, generateOffsetKeyframes } from './keyframeGenerators.js';
 import { generateRenderFrame } from './compositionGenerators.js';
 import { validatePathPoints, generateSetPathKeyframes } from './shapeGenerators.js';
@@ -83,7 +84,39 @@ describe('speed integration', () => {
   });
 });
 
+describe('render bridge contract', () => {
+  it('returns a native render result only after synchronous render completes', () => {
+    const rq = {
+      numItems: 1, rendering: false, completed: false,
+      render() { this.rendering = true; this.completed = true; this.rendering = false; }
+    };
+    const result = vm.runInNewContext(generateControlRender({ action: 'start' }), {
+      app: { project: { renderQueue: rq } }
+    });
+    assert.equal(rq.completed, true);
+    assert.equal(result.rendering, false);
+    assert.equal(result.action, 'start');
+  });
+});
+
 describe('expression compatibility and escaping', () => {
+  it('batch expressions navigate friendly aliases to the actual transform property', () => {
+    const prop = { expression: '' };
+    const transform = {
+      property(name: string) { assert.equal(name, 'ADBE Position'); return prop; }
+    };
+    class CompItem {
+      layer() {
+        return { property(name: string) { assert.equal(name, 'ADBE Transform Group'); return transform; } };
+      }
+    }
+    const result = vm.runInNewContext(generateBatchSetExpressions({
+      layerIndex: 1, expressions: [{ property: 'position', expression: 'value + [10, 20]' }]
+    }), { app: { project: { activeItem: new CompItem() } }, CompItem });
+    assert.equal(result[0].success, true);
+    assert.equal(prop.expression, 'value + [10, 20]');
+  });
+
   it('keeps legacy bounce parameters and exposes gravity bounce separately', () => {
     const templates = getExpressionTemplates();
     assert.ok(templates.bounce.params?.amplitude);

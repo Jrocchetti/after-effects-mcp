@@ -243,7 +243,7 @@ list_render_queue()            # confirm status "queued" and the real outputPath
 queue_in_ame(renderImmediately=true)     # returns immediately; AME does the encoding
 ```
 
-Avoid `control_render(action="start")` for anything long - it blocks After Effects until the queue finishes, and the call will time out.
+Avoid `control_render(action="start")` for anything long: it synchronously blocks the CEP bridge until the queue finishes, so polling and stop/pause/resume are unavailable. A command timeout does not cancel rendering; do not retry or modify the queue until AE finishes. Use AE's UI to interrupt native rendering. `list_render_queue` does not track AME progress.
 
 ---
 
@@ -278,8 +278,8 @@ add_to_render_queue(compName="Particle Text Reveal",
                     outputPath="D:/Previews/particle_text_reveal.mp4",
                     renderSettingsTemplate="Best Settings",
                     outputModuleTemplate="H.264 - Match Render Settings - 15 Mbps")
-control_render(action="start")        # a 4 s comp takes a few seconds
-remove_from_render_queue(all=true)
+queue_in_ame(renderImmediately=true)  # render duration is not predictable; prefer AME
+# Monitor completion in AME; list_render_queue is not an AME progress monitor.
 ```
 
 Timeline: the text fades in as a particle cloud, forms letters by about 1.7 s, lands at 2 s (half the duration) with the burst, and holds from there. The source comp layer gets Collapse Transformations automatically, so the scatter isn't clipped to the 1500x340 box.

@@ -10,6 +10,7 @@ import {
   generateCompAccess,
   generateLayerAccess,
   generatePropertyAccess,
+  getPropertyPath,
   wrapInUndoGroup,
   generateResultObject
 } from './helpers.js';
@@ -702,7 +703,7 @@ export function generateBatchSetExpressions(params: {
     script += '  var prop' + i + ' = layer;\n';
 
     // Navigate to property
-    const path = expr.property.split('/');
+    const path = getPropertyPath(expr.property).split('/');
     for (let j = 0; j < path.length; j++) {
       script += '  prop' + i + ' = prop' + i + '.property("' + escapeString(path[j]) + '");\n';
     }

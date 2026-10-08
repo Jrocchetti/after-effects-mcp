@@ -173,7 +173,7 @@ Check a particle setup with `render_frame` before calling it done - these parame
 
 - Call `list_render_templates` first and use the user's existing presets by name.
 - `add_to_render_queue` - `outputPath`, `renderSettingsTemplate`, `outputModuleTemplate`, `timeSpanStart`, `timeSpanDuration`. **The output module decides the file type**: a `.mov` path with an H.264 module produces `.mp4`. Report the returned `outputPath`.
-- **`control_render` with `action: "start"` blocks After Effects until the whole queue finishes**, so the call will usually time out on a real render. Prefer `queue_in_ame` (`renderImmediately: true` to start encoding), which returns straight away. Poll `list_render_queue` for status.
+- **`control_render` only supports `start` and `showWindow`.** `start` is synchronous and blocks the CEP bridge until the whole queue finishes: polling and stop/pause/resume are unavailable. **A command timeout does not cancel rendering.** Do not retry or modify the queue after a timeout until AE finishes; use AE's UI to interrupt a native render. Prefer `queue_in_ame` (`renderImmediately: true` to start encoding) for long jobs. `list_render_queue` inspects the native queue before/after rendering, not AME progress.
 - `render_frame` saves a single PNG (`time`, optional `outputDir` and `fileName`) and waits until the file is fully written. Use it to check your work.
 
 ## Known issues

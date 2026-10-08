@@ -7,6 +7,8 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv';
+import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
@@ -29,8 +31,48 @@ const logger: Logger = {
   error: (msg, meta) => console.error(`[ERROR] ${msg}`, meta ? JSON.stringify(meta) : '')
 };
 
+// Shared schemas for the newly exposed integration tools only. Legacy tools
+// retain their generator-level coercion of stringified numbers and arrays.
+const POSITIVE_INDEX_SCHEMA = { type: 'integer', minimum: 1 };
+const NONEMPTY_NAME_SCHEMA = { type: 'string', minLength: 1, pattern: '\\S' };
+const RGB_SCHEMA = {
+  type: 'object',
+  properties: {
+    r: { type: 'number', minimum: 0, maximum: 1 },
+    g: { type: 'number', minimum: 0, maximum: 1 },
+    b: { type: 'number', minimum: 0, maximum: 1 },
+    a: { type: 'number', minimum: 0, maximum: 1 }
+  },
+  required: ['r', 'g', 'b']
+};
+const POSITION_SCHEMA = {
+  type: 'object',
+  properties: { x: { type: 'number' }, y: { type: 'number' }, z: { type: 'number' } },
+  required: ['x', 'y']
+};
+const FEATHER_SCHEMA = {
+  anyOf: [
+    { type: 'number' },
+    { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2 }
+  ],
+  description: 'Feather in pixels: scalar for both axes, or [x, y]'
+};
+const LAYER_TARGETED_TOOLS = new Set([
+  'get_path', 'set_path_keyframes', 'add_shape_operator', 'set_3d_layer',
+  'set_material_options', 'set_geometry_options', 'set_camera_options', 'set_light_options',
+  'add_mask', 'list_masks', 'get_mask_path', 'set_mask_path', 'set_mask_keyframes',
+  'set_mask_properties', 'delete_mask', 'batch_set_expressions'
+]);
+const INTEGRATION_TOOLS = new Set([
+  ...LAYER_TARGETED_TOOLS, 'create_path', 'add_to_render_queue', 'list_render_queue',
+  'list_render_templates', 'set_render_queue_item', 'remove_from_render_queue',
+  'control_render', 'queue_in_ame', 'set_comp_renderer', 'get_3d_info',
+  'list_project_items', 'set_active_composition', 'set_proxy', 'remove_proxy',
+  'get_current_time', 'set_current_time', 'snap_to_marker', 'get_nearest_marker', 'navigate_markers'
+]);
+
 // Tool definitions
-const TOOLS = [
+const TOOLS: Array<Tool & { generator: (params: any) => string }> = [
   // ============================================
   // PROJECT TOOLS
   // ============================================
@@ -447,7 +489,7 @@ const TOOLS = [
         renderer: {
           type: 'string',
           description: 'classic (no extrusion), advanced (extrusion + shadow colour), cinema4d (extrusion + reflections). A raw "ADBE ..." string is also accepted.',
-          enum: ['classic', 'advanced', 'cinema4d']
+          anyOf: [{ enum: ['classic', 'advanced', 'cinema4d'] }, { pattern: '^ADBE .+' }]
         }
       },
       required: ['renderer']
@@ -769,7 +811,7 @@ const TOOLS = [
   },
   {
     name: 'list_render_queue',
-    description: 'List every render queue item with its status, time span and output modules. Use this to poll progress while a render runs.',
+    description: 'List every render queue item with its status, time span and output modules before or after native rendering. Cannot poll during control_render start because native rendering blocks the CEP bridge.',
     inputSchema: { type: 'object', properties: {} },
     generator: generators.generateListRenderQueue
   },
@@ -813,11 +855,11 @@ const TOOLS = [
   },
   {
     name: 'control_render',
-    description: 'Start, stop, pause or resume rendering, or show the Render Queue panel. WARNING: start is synchronous - After Effects blocks until the queue finishes, so this call will usually time out on any real render. Prefer queue_in_ame for long jobs, or start and then poll list_render_queue.',
+    description: 'Start synchronous native rendering or show the Render Queue panel. WARNING: start blocks the CEP bridge until rendering finishes; polling and stop/pause/resume are unavailable. A command timeout does NOT cancel rendering. Use queue_in_ame for long jobs; do not retry or modify the queue after a timeout until rendering finishes in AE.',
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['start', 'stop', 'pause', 'resume', 'showWindow'] }
+        action: { type: 'string', enum: ['start', 'showWindow'] }
       },
       required: ['action']
     },
@@ -969,7 +1011,7 @@ const TOOLS = [
           items: {
             type: 'object',
             properties: {
-              property: { type: 'string', description: 'Property name, e.g. "Position"' },
+              property: { type: 'string', description: 'Friendly property alias, e.g. "position", or a raw slash-separated match-name path' },
               expression: { type: 'string' }
             },
             required: ['property', 'expression']
@@ -1880,6 +1922,38 @@ const TOOLS = [
 ];
 
 // Create tool lookup map
+// Complete the advertised schemas before compiling the very same objects for
+// runtime validation. Do not apply strict validation to the 67 legacy tools.
+const schemaValidator = new AjvJsonSchemaValidator();
+const inputValidators = new Map<string, ReturnType<AjvJsonSchemaValidator['getValidator']>>();
+for (const tool of TOOLS) {
+  if (!INTEGRATION_TOOLS.has(tool.name)) continue;
+  const schema = tool.inputSchema;
+  const properties = schema.properties!;
+  if ('layerIndex' in properties) properties.layerIndex = POSITIVE_INDEX_SCHEMA;
+  if ('layerName' in properties) properties.layerName = NONEMPTY_NAME_SCHEMA;
+  if (LAYER_TARGETED_TOOLS.has(tool.name)) {
+    schema.anyOf = [{ required: ['layerIndex'] }, { required: ['layerName'] }];
+  }
+  if (tool.name === 'set_proxy' || tool.name === 'remove_proxy') {
+    properties.itemId = POSITIVE_INDEX_SCHEMA;
+    properties.itemName = NONEMPTY_NAME_SCHEMA;
+    schema.anyOf = [{ required: ['itemId'] }, { required: ['itemName'] }];
+  }
+  if (tool.name === 'create_path') {
+    properties.fillColor = RGB_SCHEMA;
+    properties.strokeColor = RGB_SCHEMA;
+    properties.position = POSITION_SCHEMA;
+  }
+  if (tool.name === 'add_mask' || tool.name === 'set_mask_properties') {
+    properties.color = RGB_SCHEMA;
+    properties.feather = FEATHER_SCHEMA;
+  }
+  if (tool.name === 'set_material_options') properties.shadowColor = RGB_SCHEMA;
+  if (tool.name === 'set_light_options') properties.color = RGB_SCHEMA;
+  inputValidators.set(tool.name, schemaValidator.getValidator(schema));
+}
+
 const toolMap = new Map<string, typeof TOOLS[0]>();
 TOOLS.forEach(tool => toolMap.set(tool.name, tool));
 
@@ -1930,8 +2004,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 
   try {
-    // Generate the script
-    const script = tool.generator(args as any || {});
+    // Native render blocks CEP's single command channel; these operations
+    // cannot interrupt it. Reject even stale clients before generating/IPC.
+    if (name === 'control_render' && ['stop', 'pause', 'resume'].includes((args as any)?.action)) {
+      throw new Error('The CEP bridge cannot stop, pause or resume a synchronous native render, or poll it while it runs. Use After Effects UI controls or queue_in_ame for long jobs.');
+    }
+    const params = args ?? {};
+    const validate = inputValidators.get(name);
+    if (validate) {
+      const result = validate(params);
+      if (!result.valid) throw new Error(`Invalid arguments for ${name}: ${result.errorMessage}`);
+    }
+    // Generate the script only after input validation.
+    const script = tool.generator(params);
 
     // Execute in After Effects
     const result = await communicator.executeScript(script);
