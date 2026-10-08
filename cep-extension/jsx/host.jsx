@@ -11,7 +11,8 @@ var AEMCP = {
   processedCommands: {},
   pollInterval: 100, // ms
   isRunning: false,
-  clientPrefixes: {}
+  clientPrefixes: {},
+  commandInProgress: false
 };
 
 /**
@@ -89,25 +90,68 @@ function processCommandFile(file) {
     return 1;
   }
 
-  // Execute the script
-  var result;
-  try {
-    app.beginUndoGroup("AE-MCP: " + command.id);
-
-    // Execute the script
-    result = eval(command.script);
-
-    app.endUndoGroup();
-
-    // Write success response
-    writeSuccessResponse(file, result);
-  } catch (e) {
-    app.endUndoGroup();
-    writeErrorResponse(file, e.toString());
+  // Reentrancy guard: the CEP panel polls processCommands() every 100ms
+  // via an async evalScript() call, without waiting for the previous poll
+  // to finish. ExtendScript itself is single-threaded so true overlap is
+  // rare, but if a previous command is still inside a blocking dialog
+  // (see below) when a poll fires, we must not open a second, nested
+  // undo group on top of one that hasn't closed yet - that is exactly
+  // what corrupts AE's undo stack ("取り消しのグループが一致しません").
+  if (AEMCP.commandInProgress) {
+    return 0;
   }
+  AEMCP.commandInProgress = true;
 
-  markAsProcessed(file);
-  return 1;
+  try {
+    var result;
+    try {
+      result = runCommandScript(command.script, "AE-MCP: " + command.id);
+    } catch (e) {
+      writeErrorResponse(file, e.toString());
+      markAsProcessed(file);
+      return 1;
+    }
+
+    // Response failures must not enter the script/undo cleanup path again.
+    writeSuccessResponse(file, result);
+    markAsProcessed(file);
+    return 1;
+  } finally {
+    AEMCP.commandInProgress = false;
+  }
+}
+
+/**
+ * Keep script declarations out of the caller's cleanup and file variables.
+ */
+function evaluateCommandScript(script) {
+  return eval(script);
+}
+
+/**
+ * Close each successfully opened scope once, including on execution errors.
+ * Dialog cleanup must still run if closing the undo group throws.
+ */
+function runCommandScript(script, undoName) {
+  var dialogsSuppressed = false;
+  var undoGroupStarted = false;
+  try {
+    app.beginSuppressDialogs();
+    dialogsSuppressed = true;
+    app.beginUndoGroup(undoName);
+    undoGroupStarted = true;
+    return evaluateCommandScript(script);
+  } finally {
+    try {
+      if (undoGroupStarted) {
+        app.endUndoGroup();
+      }
+    } finally {
+      if (dialogsSuppressed) {
+        app.endSuppressDialogs(false);
+      }
+    }
+  }
 }
 
 /**
@@ -250,14 +294,18 @@ function stopMCP() {
  * Execute a script directly (for testing)
  */
 function executeScript(script) {
+  if (AEMCP.commandInProgress) {
+    return JSON.stringify({ success: false, error: "Another AE-MCP command is still in progress" });
+  }
+  AEMCP.commandInProgress = true;
+
   try {
-    app.beginUndoGroup("AE-MCP Direct Execute");
-    var result = eval(script);
-    app.endUndoGroup();
+    var result = runCommandScript(script, "AE-MCP Direct Execute");
     return JSON.stringify({ success: true, data: result });
   } catch (e) {
-    app.endUndoGroup();
     return JSON.stringify({ success: false, error: e.toString() });
+  } finally {
+    AEMCP.commandInProgress = false;
   }
 }
 
