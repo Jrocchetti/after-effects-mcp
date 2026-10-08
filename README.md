@@ -41,8 +41,8 @@ AE-MCP is a comprehensive MCP server that enables AI assistants like Claude to d
 ### Step 1: Install the MCP Server
 
 ```bash
-git clone https://github.com/anthropics/ae-mcp.git
-cd ae-mcp
+git clone https://github.com/ishu86/after-effects-mcp.git
+cd after-effects-mcp
 npm install
 npm run build
 ```
@@ -73,7 +73,7 @@ Add to your config file:
   "mcpServers": {
     "ae-mcp": {
       "command": "node",
-      "args": ["/path/to/ae-mcp/dist/index.js"]
+      "args": ["/path/to/after-effects-mcp/dist/index.js"]
     }
   }
 }
@@ -90,7 +90,7 @@ Add to your MCP settings (`~/.claude/settings.json`):
   "mcpServers": {
     "ae-mcp": {
       "command": "node",
-      "args": ["/path/to/ae-mcp/dist/index.js"]
+      "args": ["/path/to/after-effects-mcp/dist/index.js"]
     }
   }
 }
@@ -226,7 +226,7 @@ Set amplitude to 0.15, frequency to 4, decay to 6.
 ## Architecture
 
 ```
-ae-mcp/
+after-effects-mcp/
 ├── src/                          # TypeScript source
 │   ├── index.ts                  # Entry point
 │   ├── stdio-server.ts           # MCP server (70+ tools)
